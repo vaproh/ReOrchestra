@@ -76,9 +76,9 @@ class ActionService:
 
             # Login if needed - go directly to login page
             tab = client.create_tab("https://old.reddit.com/login/")
-            _sleep(4, 6)
+            client.wait(tab)
 
-            snapshot, _ = client.snapshot(tab)
+            snapshot, _ = client.snapshot_quick(tab)
 
             # Check if already logged in
             if "welcome back" in snapshot.lower() and "already logged in" in snapshot.lower():
@@ -97,7 +97,7 @@ class ActionService:
                 if login_btn:
                     client.click(tab, login_btn, delay=8)
 
-                snapshot, url = client.snapshot(tab)
+                snapshot, url = client.snapshot_quick(tab)
                 if "login" in url.lower():
                     return ActionResult(success=False, action=vote_type, link=target_url, message="Login failed")
 

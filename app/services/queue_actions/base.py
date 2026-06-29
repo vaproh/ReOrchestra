@@ -150,9 +150,9 @@ class BaseAction:
             self.camofox.user_id = user_id
             self.camofox.session_key = session_key
             tab = self.camofox.create_tab(url=url)
-            time.sleep(random.uniform(5, 7))
+            self.camofox.wait(tab)
 
-            snapshot, current_url = self.camofox.snapshot(tab)
+            snapshot, current_url = self.camofox.snapshot_quick(tab)
 
             # For non-vote actions (follow/unfollow/join/leave/save): check banner BEFORE clicking
             banner = self.action_blocked_by_banner(snapshot)
@@ -174,9 +174,9 @@ class BaseAction:
                 )
 
             self.camofox.click(tab, ref)
-            time.sleep(random.uniform(2, 3))
+            self.camofox.wait(tab, timeout=3000)
 
-            after_snapshot, _ = self.camofox.snapshot(tab)
+            after_snapshot, _ = self.camofox.snapshot_quick(tab)
             verify_ok, verify_error = self.verify_success(after_snapshot)
 
             if verify_ok:

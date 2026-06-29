@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from app.config import get_settings
 from app.services.browser import CamofoxClient
+from app.models import get_db, Account
 
 settings = get_settings()
 logger = logging.getLogger("login")
@@ -41,19 +42,23 @@ def _do_login_sync(
     username: str,
     password: str,
     session_dir: str,
+    proxy: Optional[str],
+    user_id: str,
 ) -> Tuple[bool, int]:
     client = None
     tab = None
 
     try:
-        client = CamofoxClient()
+        client = CamofoxClient(user_id=user_id, session_key=f"login_{username}")
 
-        # Go directly to login page
+        if proxy:
+            client.set_user_proxy(user_id, proxy)
+
         tab = client.create_tab("https://old.reddit.com/login/")
-        _sleep(4, 6)
+        client.wait(tab)
 
         # Step 3: Get snapshot and check if already logged in
-        snapshot, _ = client.snapshot(tab)
+        snapshot, _ = client.snapshot_quick(tab)
         if "welcome back" in snapshot.lower() and "already logged in" in snapshot.lower():
             _save_session(username, session_dir, {"username": username, "logged_in": True, "url": "https://www.reddit.com/"})
             logger.info(f"login | already_logged_in | username={username}")
@@ -75,7 +80,7 @@ def _do_login_sync(
             client.click(tab, login_btn, delay=8)
 
         # Step 4: Verify login succeeded
-        snapshot, url = client.snapshot(tab)
+        snapshot, url = client.snapshot_quick(tab)
 
         if "login" not in url.lower():
             # Login successful
@@ -123,6 +128,21 @@ class LoginService:
                 return True, 0
 
         logger.info(f"login | attempting | username={username}")
+
+        account_id = None
+        db = next(get_db())
+        try:
+            account = db.query(Account).filter(Account.username == username).first()
+            if account:
+                account_id = account.id
+        finally:
+            db.close()
+
+        if not account_id:
+            logger.error(f"login | account_not_found | username={username}")
+            return False, 0
+
+        user_id = f"s_{account_id}"
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             self._executor,
@@ -130,6 +150,8 @@ class LoginService:
             username,
             password,
             self.session_dir,
+            proxy,
+            user_id,
         )
         return result
 

@@ -16,16 +16,18 @@ import logging
 import threading
 from datetime import datetime
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from sqlalchemy.orm import Session
 
 from app.models import (
     Task, TaskStatus, Worker, WorkerStatus,
-    TaskActionLog, ActionOutcome,
+    TaskActionLog, ActionOutcome, SessionLocal,
 )
 from app.services.browser import CamofoxClient
 from app.services.worker_pool import WorkerPool
 from app.services.queue_actions import get_action_class, dedup_hash
+from app.config import get_settings
 
 logger = logging.getLogger("queue")
 
@@ -36,7 +38,8 @@ class QueueProcessor:
         self.camofox = camofox or CamofoxClient()
         self.pool = WorkerPool(db)
         self.max_retries = 3
-        self.max_concurrent_per_task = 3
+        settings = get_settings()
+        self.max_concurrent_per_task = getattr(settings, 'max_concurrent_per_task', 3)
         self.action_timeout = 120
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -152,6 +155,51 @@ class QueueProcessor:
             "duration_ms": final_result.duration_ms if final_result else 0,
         }
 
+    def _execute_for_worker_in_thread(self, task: Task, worker: Worker, db: Session) -> dict:
+        """
+        Thread-safe version of execute_for_worker that uses a separate DB session.
+        """
+        action_cls = get_action_class(task.action_type)
+        if not action_cls:
+            logger.error(f"No action class for {task.action_type}")
+            return {"success": False, "outcome": "failed", "error": "No action class", "attempts": 0, "duration_ms": 0}
+
+        action = action_cls(self.camofox)
+        total_attempts = 0
+        final_result = None
+
+        for attempt in range(1, self.max_retries + 1):
+            logger.info(
+                f"queue | task_attempt | task_id={task.id} worker_id={worker.id} attempt={attempt}/{self.max_retries}"
+            )
+            total_attempts = attempt
+            result = action.execute(worker, task.target_url)
+            final_result = result
+
+            if result.success:
+                break
+
+            if result.outcome == "popup_suspended":
+                logger.warning(f"queue | worker_suspended | worker_id={worker.id} task_id={task.id}")
+                self.pool.mark_worker_suspended(worker.id)
+                break
+
+            if result.outcome == "duplicate":
+                break
+
+            if attempt < self.max_retries:
+                backoff = min(2 ** attempt, 30)
+                logger.info(f"queue | retry_backoff | task_id={task.id} worker_id={worker.id} backoff={backoff}s")
+                time.sleep(backoff)
+
+        return {
+            "success": final_result.success if final_result else False,
+            "outcome": final_result.outcome if final_result else "failed",
+            "error": final_result.error if final_result else "No result",
+            "attempts": total_attempts,
+            "duration_ms": final_result.duration_ms if final_result else 0,
+        }
+
     def process_task(self, task: Task):
         """Process a single task to completion."""
         task.status = TaskStatus.running
@@ -163,51 +211,72 @@ class QueueProcessor:
         assigned_ids = json.loads(task.workers_assigned or "[]")
         failed_ids = json.loads(task.failed_workers or "[]")
 
-        # Assign workers in batches until workers_needed is met
+        def run_worker(worker: Worker) -> dict:
+            thread_db = SessionLocal()
+            try:
+                result = self._execute_for_worker_in_thread(task, worker, thread_db)
+                return {"worker": worker, "result": result, "error": None}
+            except Exception as e:
+                logger.exception(f"Worker {worker.id} raised exception")
+                return {"worker": worker, "result": None, "error": str(e)}
+            finally:
+                thread_db.close()
+
         while len(assigned_ids) < task.workers_needed:
-            assigned = self.pool.assign_workers(task, self.max_concurrent_per_task)
+            batch_size = min(self.max_concurrent_per_task, task.workers_needed - len(assigned_ids))
+            assigned = self.pool.assign_workers(task, batch_size)
             if not assigned:
                 logger.info(f"queue | no_idle_workers | task_id={task.id}")
                 break
             assigned_ids = json.loads(task.workers_assigned or "[]")
 
-            for worker in assigned:
-                result = self.execute_for_worker(task, worker)
-                success = result["success"]
+            max_workers = min(len(assigned), self.max_concurrent_per_task)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(run_worker, worker): worker for worker in assigned}
+                for future in as_completed(futures):
+                    worker = futures[future]
+                    try:
+                        data = future.result()
+                        if data["error"]:
+                            result = {"success": False, "outcome": "worker_exception", "error": data["error"], "attempts": 0, "duration_ms": 0}
+                        else:
+                            result = data["result"]
+                    except Exception as e:
+                        logger.exception(f"Worker {worker.id} future exception")
+                        result = {"success": False, "outcome": "worker_exception", "error": str(e), "attempts": 0, "duration_ms": 0}
 
-                # Insert log
-                h = dedup_hash(worker.id, task.action_type, task.target_url)
-                log = TaskActionLog(
-                    task_id=task.id,
-                    worker_id=worker.id,
-                    action_type=task.action_type,
-                    target_url=task.target_url,
-                    success=success,
-                    outcome=result["outcome"],
-                    error=result["error"],
-                    attempts=result["attempts"],
-                    duration_ms=result["duration_ms"],
-                    dedup_hash=h,
-                )
-                self.db.add(log)
+                    success = result["success"]
 
-                # Handle banner outcomes (non-vote actions fail early with header_*) and popup outcomes
-                outcome = result["outcome"]
-                if outcome in ("popup_suspended", "header_suspended"):
-                    self.pool.mark_worker_suspended(worker.id)
-                elif outcome == "header_banned":
-                    self.pool.mark_worker_dead(worker.id)
+                    h = dedup_hash(worker.id, task.action_type, task.target_url)
+                    log = TaskActionLog(
+                        task_id=task.id,
+                        worker_id=worker.id,
+                        action_type=task.action_type,
+                        target_url=task.target_url,
+                        success=success,
+                        outcome=result["outcome"],
+                        error=result["error"],
+                        attempts=result["attempts"],
+                        duration_ms=result["duration_ms"],
+                        dedup_hash=h,
+                    )
+                    self.db.add(log)
 
-                self.pool.release_worker(worker.id, success)
-                failed_ids = json.loads(task.failed_workers or "[]")
-                if not success:
-                    failed_ids.append(worker.id)
-                    task.failed_workers = json.dumps(failed_ids)
-                task.workers_completed += 1
-                self.db.commit()
-                assigned_ids = json.loads(task.workers_assigned or "[]")
+                    outcome = result["outcome"]
+                    if outcome in ("popup_suspended", "header_suspended"):
+                        self.pool.mark_worker_suspended(worker.id)
+                    elif outcome == "header_banned":
+                        self.pool.mark_worker_dead(worker.id)
 
-        # Finalize
+                    self.pool.release_worker(worker.id, success)
+                    failed_ids = json.loads(task.failed_workers or "[]")
+                    if not success:
+                        failed_ids.append(worker.id)
+                        task.failed_workers = json.dumps(failed_ids)
+                    task.workers_completed += 1
+                    self.db.commit()
+                    assigned_ids = json.loads(task.workers_assigned or "[]")
+
         total = task.workers_completed
         failed = len(failed_ids)
         succeeded = total - failed

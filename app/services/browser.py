@@ -60,9 +60,24 @@ class CamofoxClient:
         logger.debug(f"browser | navigate | tab_id={tab.tab_id} result_url={result_url}")
         return result_url
 
-    def snapshot(self, tab: Tab) -> tuple[str, str]:
-        """Returns (snapshot_text, current_url)"""
-        logger.debug(f"browser | snapshot | tab_id={tab.tab_id}")
+    def wait(self, tab: Tab, timeout: int = 5000, wait_network: bool = True) -> dict:
+        """Wait for page readiness via POST /tabs/:tabId/wait."""
+        logger.debug(f"browser | wait | tab_id={tab.tab_id} timeout={timeout}ms")
+        try:
+            resp = requests.post(
+                self._url(f"/tabs/{tab.tab_id}/wait"),
+                json={"userId": tab.user_id, "timeout": timeout, "waitForNetwork": wait_network},
+                timeout=timeout / 1000 + 5,
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            logger.warning(f"browser | wait | tab_id={tab.tab_id} error={e}")
+            return {"ok": False, "ready": False}
+
+    def snapshot_quick(self, tab: Tab) -> tuple[str, str]:
+        """Snapshot with minimal settle (no explicit wait)."""
+        logger.debug(f"browser | snapshot_quick | tab_id={tab.tab_id}")
         resp = requests.get(
             self._url(f"/tabs/{tab.tab_id}/snapshot"),
             params={"userId": tab.user_id},
@@ -71,8 +86,14 @@ class CamofoxClient:
         resp.raise_for_status()
         data = resp.json()
         snapshot_len = len(data.get("snapshot", ""))
-        logger.debug(f"browser | snapshot | tab_id={tab.tab_id} snapshot_len={snapshot_len}")
+        logger.debug(f"browser | snapshot_quick | tab_id={tab.tab_id} snapshot_len={snapshot_len}")
         return data.get("snapshot", ""), data.get("url", "")
+
+    def snapshot(self, tab: Tab, wait_ready: bool = True, timeout: int = 5000) -> tuple[str, str]:
+        """Returns (snapshot_text, current_url). Optionally waits for page readiness first."""
+        if wait_ready:
+            self.wait(tab, timeout=timeout, wait_network=True)
+        return self.snapshot_quick(tab)
 
     def type_text(self, tab: Tab, ref: str, text: str, delay: float = 0.5) -> None:
         logger.debug(f"browser | type_text | tab_id={tab.tab_id} ref={ref} text_len={len(text)}")
@@ -118,6 +139,17 @@ class CamofoxClient:
     def health(self) -> dict:
         logger.debug("browser | health_check")
         resp = requests.get(self._url("/"), timeout=5)
+        return resp.json()
+
+    def set_user_proxy(self, user_id: str, proxy: str) -> dict:
+        """Assign proxy to user via sticky-proxy plugin."""
+        logger.debug(f"browser | set_user_proxy | user_id={user_id} proxy={proxy}")
+        resp = requests.post(
+            self._url(f"/users/{user_id}/proxy"),
+            json={"proxy": proxy},
+            timeout=10,
+        )
+        resp.raise_for_status()
         return resp.json()
 
 
