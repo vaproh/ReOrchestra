@@ -1,0 +1,73 @@
+# Environment
+.env
+.env.*
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.tbl
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Data
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/reddit.db
+data/old_backup.db
+data/sessions/
+data/logs/
+data/screenshots/
+data/uploads/
+data/proxies.txt
+
+# Browser / Camofox
+data/sessions/
+*.cookies
+cookies/
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# Uploads
+uploads/
+*.upload

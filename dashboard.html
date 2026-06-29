@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reddit Automation Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        h1 { color: #ff4500; margin-bottom: 20px; font-size: 1.5rem; }
+        h2 { color: #ff4500; margin: 20px 0 10px; font-size: 1.1rem; }
+        .card { background: #1a1a1a; border-radius: 8px; padding: 16px; margin-bottom: 16px; border: 1px solid #333; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+        .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; }
+        .stat:last-child { border-bottom: none; }
+        .stat-label { color: #888; }
+        .stat-value { font-weight: 600; }
+        .btn { background: #ff4500; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 4px; transition: background 0.2s; }
+        .btn:hover { background: #ff5722; }
+        .btn:disabled { background: #444; cursor: not-allowed; }
+        .btn-secondary { background: #333; }
+        .btn-secondary:hover { background: #444; }
+        .btn-small { padding: 6px 10px; font-size: 12px; }
+        input, select, textarea { background: #222; border: 1px solid #444; color: #e0e0e0; padding: 8px 12px; border-radius: 6px; width: 100%; margin: 4px 0; font-size: 14px; }
+        textarea { height: 120px; font-family: monospace; resize: vertical; }
+        label { display: block; margin-top: 12px; color: #888; font-size: 12px; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .status-dot.green { background: #4caf50; }
+        .status-dot.red { background: #f44336; }
+        .status-dot.yellow { background: #ffc107; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #333; }
+        th { color: #888; font-weight: 500; }
+        .log { background: #111; padding: 12px; border-radius: 6px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #222; }
+        .log-entry.success { color: #4caf50; }
+        .log-entry.error { color: #f44336; }
+        .log-entry.info { color: #2196f3; }
+        .flex { display: flex; gap: 8px; }
+        .flex > * { flex: 1; }
+        #api-base { background: #222; border-color: #ff4500; }
+    </style>
+</head>
+<body>
+    <h1>Reddit Automation Dashboard</h1>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Config</h2>
+            <label>API Base URL</label>
+            <input type="text" id="api-base" value="http://localhost:8000" placeholder="http://localhost:8000">
+            <div class="flex" style="margin-top: 12px;">
+                <button class="btn" onclick="testConnection()">Test Connection</button>
+                <button class="btn btn-secondary" onclick="loadStats()">Refresh Stats</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>System Status</h2>
+            <div class="stat">
+                <span class="stat-label">API Status</span>
+                <span class="stat-value" id="api-status">-</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Camofox</span>
+                <span class="stat-value" id="camofox-status">-</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Total Accounts</span>
+                <span class="stat-value" id="total-accounts">-</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Active Proxies</span>
+                <span class="stat-value" id="active-proxies">-</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Account Stats</h2>
+            <div class="stat">
+                <span class="stat-label">Fresh</span>
+                <span class="stat-value" id="stat-fresh">-</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Logged In</span>
+                <span class="stat-value" id="stat-logged_in">-</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Banned</span>
+                <span class="stat-value" id="stat-banned">-</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Dead</span>
+                <span class="stat-value" id="stat-dead">-</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Import Accounts</h2>
+            <label>Format: username,password,email (one per line)</label>
+            <textarea id="accounts-input" placeholder="user1,pass1,email1@test.com
+user2,pass2,email2@test.com"></textarea>
+            <button class="btn" onclick="importAccounts()">Import Accounts</button>
+        </div>
+
+        <div class="card">
+            <h2>Import Proxies</h2>
+            <label>Proxy Format: host:port:user:pass (one per line)</label>
+            <textarea id="proxies-input" placeholder="core-residential.evomi.com:1000:user:pass_session-XXX"></textarea>
+            <button class="btn" onclick="importProxies()">Import Proxies</button>
+        </div>
+
+        <div class="card">
+            <h2>Replace Dead Proxies</h2>
+            <div class="stat">
+                <span class="stat-label">Dead Proxies</span>
+                <span class="stat-value" id="dead-proxy-count">-</span>
+            </div>
+            <button class="btn" onclick="loadDeadProxies()">Show Dead Proxies</button>
+            <div id="dead-proxies-list" style="margin-top: 10px; max-height: 150px; overflow-y: auto;"></div>
+            <label style="margin-top: 10px;">Paste new proxies to replace dead ones:</label>
+            <textarea id="new-proxies-input" placeholder="http://core-residential.evomi.com:1000:vaproh4:5AAZEVzDThgnvPDXuDqR_country-US_hardsession-NEW"></textarea>
+            <button class="btn" onclick="replaceDeadProxies()">Replace Dead Proxies</button>
+        </div>
+
+        <div class="card">
+            <h2>Actions</h2>
+            <label>Target URL (Reddit post/comment)</label>
+            <input type="text" id="target-url" placeholder="https://reddit.com/r/...">
+            <label>Account IDs (comma-separated, empty = all active)</label>
+            <input type="text" id="account-ids" placeholder="1,2,3">
+            <div style="margin-top: 12px;">
+                <button class="btn" onclick="loginSelected()">Login Selected</button>
+                <button class="btn" onclick="upvoteTarget()">Upvote Target</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Accounts</h2>
+        <div style="margin-bottom: 10px;">
+            <select id="filter-status" onchange="loadAccounts()">
+                <option value="">All Status</option>
+                <option value="fresh">Fresh</option>
+                <option value="logged_in">Logged In</option>
+                <option value="banned">Banned</option>
+                <option value="dead">Dead</option>
+            </select>
+            <button class="btn btn-small" onclick="loadAccounts()">Filter</button>
+        </div>
+        <div style="max-height: 300px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Status</th>
+                        <th>Proxy</th>
+                        <th>Votes Today</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="accounts-table"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Proxies</h2>
+        <div style="max-height: 200px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Host</th>
+                        <th>Type</th>
+                        <th>Assigned</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="proxies-table"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Action Log</h2>
+        <button class="btn btn-small" onclick="clearLog()">Clear</button>
+        <div class="log" id="action-log"></div>
+    </div>
+
+    <script>
+        const api = () => document.getElementById('api-base').value;
+
+        async function request(method, path, body) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            try {
+                const res = await fetch(`${api()}${path}`, opts);
+                const data = await res.json();
+                return { ok: res.ok, status: res.status, data };
+            } catch (e) {
+                return { ok: false, error: e.message };
+            }
+        }
+
+        function log(msg, type = 'info') {
+            const el = document.getElementById('action-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.insertBefore(entry, el.firstChild);
+        }
+
+        function clearLog() { document.getElementById('action-log').innerHTML = ''; }
+
+        async function testConnection() {
+            const res = await request('GET', '/');
+            if (res.ok) {
+                document.getElementById('api-status').innerHTML = '<span class="status-dot green"></span>Connected';
+                log('API connected successfully', 'success');
+                loadStats();
+            } else {
+                document.getElementById('api-status').innerHTML = '<span class="status-dot red"></span>Failed';
+                log('API connection failed: ' + (res.error || 'Unknown error'), 'error');
+            }
+        }
+
+        async function loadStats() {
+            const [accounts, proxies, health, deadProxies] = await Promise.all([
+                request('GET', '/api/accounts?per_page=1000'),
+                request('GET', '/api/proxies'),
+                request('GET', '/api/admin/health'),
+                request('GET', '/api/proxies?status=dead')
+            ]);
+
+            if (accounts.ok) {
+                const data = accounts.data.data;
+                document.getElementById('total-accounts').textContent = data.total;
+                const counts = { fresh: 0, logged_in: 0, banned: 0, dead: 0 };
+                data.accounts.forEach(a => counts[a.status] = (counts[a.status] || 0) + 1);
+                Object.keys(counts).forEach(s => {
+                    const el = document.getElementById(`stat-${s}`);
+                    if (el) el.textContent = counts[s];
+                });
+            }
+
+            if (proxies.ok) {
+                const data = proxies.data.data;
+                document.getElementById('active-proxies').textContent = data.total;
+            }
+
+            if (deadProxies.ok) {
+                document.getElementById('dead-proxy-count').textContent = deadProxies.data.data.total;
+            }
+
+            if (health.ok) {
+                const h = health.data.data || health.data;
+                const connected = h.browserConnected ? 'green' : 'red';
+                document.getElementById('camofox-status').innerHTML =
+                    `<span class="status-dot ${connected}"></span>${h.browserRunning ? 'Running' : 'Stopped'}`;
+            } else {
+                document.getElementById('camofox-status').innerHTML = '<span class="status-dot yellow"></span>Unknown';
+            }
+        }
+
+        async function loadAccounts() {
+            const status = document.getElementById('filter-status').value;
+            const url = `/api/accounts?per_page=100${status ? '&status=' + status : ''}`;
+            const res = await request('GET', url);
+            const tbody = document.getElementById('accounts-table');
+            tbody.innerHTML = '';
+
+            if (res.ok) {
+                res.data.data.accounts.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${a.id}</td>
+                        <td>${a.username}</td>
+                        <td><span class="status-dot ${a.status === 'logged_in' ? 'green' : a.status === 'banned' ? 'red' : 'yellow'}"></span>${a.status}</td>
+                        <td>${a.proxy || '-'}</td>
+                        <td>${a.votes_today || 0}</td>
+                        <td>
+                            <button class="btn btn-small" onclick="loginAccount(${a.id})">Login</button>
+                            <button class="btn btn-small btn-secondary" onclick="deleteAccount(${a.id})">Del</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function loadProxies() {
+            const res = await request('GET', '/api/proxies?per_page=100');
+            const tbody = document.getElementById('proxies-table');
+            tbody.innerHTML = '';
+
+            if (res.ok) {
+                res.data.data.proxies.forEach(p => {
+                    const tr = document.createElement('tr');
+                    const statusColor = p.status === 'dead' ? '#f44336' : p.status === 'active' ? '#4caf50' : '#ffc107';
+                    tr.innerHTML = `
+                        <td>${p.id}</td>
+                        <td>${p.host || p.proxy_string?.split(':')[0] || '-'}</td>
+                        <td>${p.proxy_type}</td>
+                        <td>${p.assigned_account_id || '-'}</td>
+                        <td style="color: ${statusColor};">${p.status}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function importAccounts() {
+            const text = document.getElementById('accounts-input').value.trim();
+            if (!text) return log('No accounts to import', 'error');
+
+            const accounts = text.split('\n').filter(l => l.trim()).map(line => {
+                const [username, password, email] = line.split(',').map(s => s.trim());
+                return { username, password, email: email || `${username}@test.com` };
+            });
+
+            log(`Importing ${accounts.length} accounts...`);
+            const res = await request('POST', '/api/accounts/import', {
+                accounts,
+                account_type: 'upvoter'
+            });
+
+            if (res.ok) {
+                log(`Imported ${res.data.data.imported} accounts`, 'success');
+                document.getElementById('accounts-input').value = '';
+                loadAccounts();
+                loadStats();
+            } else {
+                log('Import failed: ' + JSON.stringify(res.data), 'error');
+            }
+        }
+
+        async function importProxies() {
+            const text = document.getElementById('proxies-input').value.trim();
+            if (!text) return log('No proxies to import', 'error');
+
+            const proxies = text.split('\n').filter(l => l.trim());
+            log(`Importing ${proxies.length} proxies...`);
+            const res = await request('POST', '/api/proxies/import', { proxies });
+
+            if (res.ok) {
+                log(`Imported ${res.data.data.imported} proxies`, 'success');
+                document.getElementById('proxies-input').value = '';
+                loadProxies();
+                loadStats();
+            } else {
+                log('Import failed: ' + JSON.stringify(res.data), 'error');
+            }
+        }
+
+        async function loadDeadProxies() {
+            const res = await request('GET', '/api/proxies?status=dead');
+            const container = document.getElementById('dead-proxies-list');
+            const countEl = document.getElementById('dead-proxy-count');
+
+            if (res.ok) {
+                const data = res.data.data;
+                countEl.textContent = data.total;
+                container.innerHTML = '';
+
+                if (data.total === 0) {
+                    container.innerHTML = '<div style="color: #4caf50;">No dead proxies!</div>';
+                    return;
+                }
+
+                data.proxies.forEach(p => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'padding: 4px 0; border-bottom: 1px solid #333; font-size: 12px;';
+                    div.innerHTML = `<span style="color: #f44336;">ID ${p.id}:</span> ${p.proxy_string.substring(0, 60)}... <span style="color: #888;">(${p.fail_count} fails)</span>`;
+                    container.appendChild(div);
+                });
+            } else {
+                log('Failed to load dead proxies', 'error');
+            }
+        }
+
+        async function replaceDeadProxies() {
+            const newProxies = document.getElementById('new-proxies-input').value.trim();
+            if (!newProxies) return log('No new proxies provided', 'error');
+
+            const proxies = newProxies.split('\n').filter(l => l.trim());
+            log(`Replacing dead proxies with ${proxies.length} new proxies...`);
+
+            const res = await request('POST', '/api/proxies/replace', { proxies });
+
+            if (res.ok) {
+                const data = res.data.data;
+                log(`Replaced ${data.replaced} dead proxies. ${data.remaining_dead} still dead. Skipped: ${data.skipped}`, data.remaining_dead > 0 ? 'error' : 'success');
+                document.getElementById('new-proxies-input').value = '';
+                loadDeadProxies();
+                loadProxies();
+                loadStats();
+            } else {
+                log('Replace failed: ' + JSON.stringify(res.data), 'error');
+            }
+        }
+
+        async function loginAccount(id) {
+            log(`Logging in account ${id}...`);
+            const res = await request('POST', '/api/accounts/login', {
+                account_ids: [id],
+                options: { headless: true },
+                force: true
+            });
+
+            if (res.ok && res.data.data.results?.[0]?.success) {
+                log(`Account ${id} logged in successfully`, 'success');
+                loadAccounts();
+            } else {
+                log(`Login failed: ${res.data?.data?.results?.[0]?.error || 'Unknown'}`, 'error');
+            }
+        }
+
+        async function loginSelected() {
+            const ids = document.getElementById('account-ids').value.trim();
+            const accountIds = ids ? ids.split(',').map(s => parseInt(s.trim())).filter(n => n) : [];
+
+            if (!accountIds.length) {
+                log('No account IDs specified', 'error');
+                return;
+            }
+
+            log(`Logging in ${accountIds.length} accounts...`);
+            const res = await request('POST', '/api/accounts/login', {
+                account_ids: accountIds,
+                options: { headless: true },
+                force: true
+            });
+
+            if (res.ok) {
+                const results = res.data.data;
+                log(`Logged in ${results.logged_in}/${results.total} accounts`, results.failed > 0 ? 'error' : 'success');
+                loadAccounts();
+            } else {
+                log('Batch login failed', 'error');
+            }
+        }
+
+        async function upvoteTarget() {
+            const url = document.getElementById('target-url').value.trim();
+            const ids = document.getElementById('account-ids').value.trim();
+            const accountIds = ids ? ids.split(',').map(s => parseInt(s.trim())).filter(n => n) : [];
+
+            if (!url) return log('No target URL specified', 'error');
+
+            log(`Upvoting ${url} with ${accountIds.length || 'all'} accounts...`);
+            const res = await request('POST', '/api/actions/upvote', {
+                target_url: url,
+                account_ids: accountIds.length ? accountIds : undefined
+            });
+
+            if (res.ok) {
+                log(`Upvote completed: ${res.data.data.succeeded}/${res.data.data.total}`, 'success');
+            } else {
+                log(`Upvote failed: ${res.data?.error || 'Unknown'}`, 'error');
+            }
+        }
+
+        async function deleteAccount(id) {
+            if (!confirm(`Delete account ${id}?`)) return;
+            const res = await request('DELETE', `/api/accounts/${id}`);
+            if (res.ok) {
+                log(`Account ${id} deleted`, 'success');
+                loadAccounts();
+                loadStats();
+            } else {
+                log('Delete failed', 'error');
+            }
+        }
+
+        // Load on init
+        loadAccounts();
+        loadProxies();
+        loadStats();
+    </script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+app:
+  name: "Reddit Automation API"
+  version: "1.0.0"
+
+rate_limits:
+  max_votes_per_day: 15
+  max_votes_per_week: 100
+  min_seconds_between_votes: 120
+  max_vote_only_ratio: 0.3
+
+concurrency:
+  max_concurrent_per_slot: 10
+  slots_auto_scale: true
+  accounts_per_slot: 50
+
+timing:
+  jitter_sigma: 120
+  skip_cycle_chance: 0.08
+  clump_chance: 0.15
+  micro_jitter_min_ms: 100
+  micro_jitter_max_ms: 900
+
+s_curve:
+  enabled: true
+  initial_burst: 0.30
+  peak: 0.45
+  decay: 0.20
+  tail: 0.05
+
+activation:
+  batch_size: 50
+  spread_days: 3
+
+burn_detection:
+  consecutive_failures: 5
+  rate_limit_backoff_hours: 24
+  success_rate_threshold: 0.8
+
+session:
+  max_age_hours: 72
+  refresh_before_hours: 12
+
+account_limits:
+  max_fail_count: 10
+  dead_after_ban: true
+
+logging:
+  level: "INFO"
+  file: "data/logs/app.log"
+  max_bytes: 10485760
+  backup_count: 5
