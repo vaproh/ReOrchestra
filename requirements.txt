@@ -1,12 +1,8 @@
-fastapi[standard]
-uvicorn[standard]
+fastapi>=0.100
+uvicorn[standard]>=0.23
 sqlalchemy>=2.0
 pydantic>=2.0
+pydantic-settings>=2.0
 python-dotenv>=1.0
 requests>=2.31
-aiofiles>=23.0
-selenium>=4.10.0
 pyyaml>=6.0
-numpy>=1.24
-# Optional (requires gfortran to compile). Without it, mouse clicks are direct instead of Bezier-curve human-like.
-# bezier>=2023.7.28
