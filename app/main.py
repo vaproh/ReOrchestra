@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Reddit API",
+    title="ReOrchestra",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -63,4 +63,4 @@ app.include_router(gui_router, prefix="/gui")
 
 @app.get("/")
 async def root():
-    return {"message": "Reddit API", "version": "1.0.0", "docs": "/docs", "gui": "/gui"}
+    return {"message": "ReOrchestra API", "version": "1.0.0", "docs": "/docs", "gui": "/gui"}

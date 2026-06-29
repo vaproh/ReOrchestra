@@ -12,7 +12,7 @@ GUI_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reddit Automation</title>
+<title>ReOrchestra</title>
 <style>
   :root {
     --bg: #0e1113;
@@ -108,7 +108,7 @@ GUI_HTML = """<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>Reddit Automation</h1>
+  <h1>ReOrchestra</h1>
   <span class="sub" id="version">v1.0</span>
 </header>
 <main>

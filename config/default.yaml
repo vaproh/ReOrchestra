@@ -1,5 +1,5 @@
 app:
-  name: "Reddit Automation API"
+  name: "ReOrchestra"
   version: "1.0.0"
 
 rate_limits:
