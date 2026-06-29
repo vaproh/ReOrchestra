@@ -4,8 +4,8 @@ import subprocess
 import time
 import signal
 import shutil
+import itertools
 import pytest
-import warnings
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -20,15 +20,43 @@ from app.services.queue_processor import QueueProcessor
 settings = get_settings()
 
 
+def load_proxies():
+    """Load proxies from proxy file (same as production)."""
+    proxy_file = settings.proxy_file
+    if not os.path.exists(proxy_file):
+        print(f"WARNING: Proxy file not found: {proxy_file}")
+        return []
+    with open(proxy_file, "r") as f:
+        proxies = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    return proxies
+
+
+# Create proxy iterator for 1:1 allocation (same as production)
+_proxy_pool = None
+_proxy_cycle = None
+
+
+def get_proxy_cycle():
+    """Get or create proxy iterator."""
+    global _proxy_pool, _proxy_cycle
+    if _proxy_pool is None:
+        _proxy_pool = load_proxies()
+        if not _proxy_pool:
+            raise RuntimeError(f"No proxies found in {settings.proxy_file}")
+        _proxy_cycle = itertools.cycle(_proxy_pool)
+        print(f"Loaded {len(_proxy_pool)} proxies from {settings.proxy_file}")
+    return _proxy_cycle
+
+
 def cleanup_test_sessions():
     """Clean up test sessions from Camofox data directory."""
     if not settings.is_test_mode:
         return
-    
+
     camofox_data = os.path.join(settings.camofox_path, "data")
     if not os.path.exists(camofox_data):
         return
-    
+
     # Clean sessions directory
     sessions_path = os.path.join(camofox_data, "sessions")
     if os.path.exists(sessions_path):
@@ -40,7 +68,7 @@ def cleanup_test_sessions():
                     print(f"Cleaned test session: {item}")
                 except Exception as e:
                     print(f"Failed to clean {item}: {e}")
-    
+
     # Clean user profiles for test accounts
     users_path = os.path.join(camofox_data, "users")
     if os.path.exists(users_path):
@@ -119,13 +147,9 @@ def db_session(db_engine):
 
 @pytest.fixture(scope="session")
 def test_proxy():
-    """Get test proxy from settings or environment."""
-    proxy = os.environ.get("TEST_PROXY", settings.test_proxy)
-    if proxy == "http://test_proxy:8080":
-        warnings.warn(
-            "Using default test proxy. Set TEST_PROXY env var or TEST_PROXY in .env to override.",
-            UserWarning
-        )
+    """Get next proxy from proxy file (1:1 allocation, same as production)."""
+    cycle = get_proxy_cycle()
+    proxy = next(cycle)
     return proxy
 
 

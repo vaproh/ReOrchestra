@@ -51,7 +51,6 @@ class Settings(BaseSettings):
     test_server_port: int = 8080
     test_db_url: str = "sqlite:///./data/test.db"
     test_session_dir: str = "data/test_sessions"
-    test_proxy: str = "http://test_proxy:8080"
 
     # ===== TUNNEL =====
     tunnel_domain: str = "vaproh.space"
