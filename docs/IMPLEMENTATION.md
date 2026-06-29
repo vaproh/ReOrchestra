@@ -4,7 +4,8 @@
 
 This guide covers setup, configuration, API usage, and operation of the Reddit Automation API system.
 
-**Version:** 0.8
+**Version:** 0.8  
+**Last Updated:** June 2026
 
 ---
 
@@ -707,11 +708,40 @@ curl -X POST http://localhost:8000/api/queue/start
 
 ### 6.3 Logging
 
-Logs are written to `data/logs/app.log`. Check there for detailed error information.
+The system uses structured logging with component prefixes.
+
+**Log Components:**
+| Component | Description |
+|-----------|-------------|
+| `api` | HTTP requests and responses |
+| `queue` | Queue processor operations |
+| `browser` | Camofox API calls (debug level) |
+| `login` | Login attempts and results |
+
+**Log Format:**
+```
+{timestamp} | {level} | {component} | {message}
+```
+
+**Example log output:**
+```
+2026-06-29 15:45:23,456 | INFO | queue | Processing task 1 (upvote_post)
+2026-06-29 15:45:23,458 | INFO | queue | Task 1 worker 1 attempt 1/3
+2026-06-29 15:45:30,123 | INFO | browser | create_tab | tab_id=abc123 | duration=1.2s
+2026-06-29 15:45:36,789 | INFO | browser | click | ref=e90 | duration=30.5s
+2026-06-29 15:45:38,456 | INFO | queue | Task 1 failed - 0 ok, 1 failed
+```
+
+**Log files:**
+- Console: stdout (uvicorn)
+- File: `data/logs/app.log` (when configured)
 
 ```bash
 # View recent logs
 tail -f data/logs/app.log
+
+# Filter by component
+grep "queue" data/logs/app.log
 
 # Increase verbosity
 # Set LOG_LEVEL=DEBUG in .env
