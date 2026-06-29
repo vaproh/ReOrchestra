@@ -4,6 +4,45 @@
 
 ---
 
+## Configuration
+
+All settings are managed via `.env` file and `app/config.py`.
+
+### Key Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `APP_MODE` | `production` | `production` or `test` |
+| `CAMOFOX_DIR` | `../camofox` | Path to Camofox directory |
+| `CAMOFOX_PORT` | `9377` | Camofox server port |
+| `TEST_SERVER_URL` | `http://localhost:8080` | Test server URL |
+| `TEST_SERVER_PORT` | `8080` | Test server port |
+| `TEST_DB_URL` | `sqlite:///./data/test.db` | Test database |
+| `TEST_SESSION_DIR` | `data/test_sessions` | Test sessions directory |
+| `TEST_PROXY` | `http://test_proxy:8080` | Test proxy |
+| `TUNNEL_DOMAIN` | `vaproh.space` | Tunnel domain |
+| `TUNNEL_SUBDOMAIN` | `reorchestra-test` | Tunnel subdomain |
+| `TUNNEL_NAME` | `reorchestra-test` | Cloudflare tunnel name |
+
+### Starting Test Mode
+
+```bash
+# 1. Set mode
+export APP_MODE=test
+export TEST_SERVER_URL=https://reorchestra-test.vaproh.space
+
+# 2. Start tunnel (Terminal 1)
+python tests/start_permanent_tunnel.py
+
+# 3. Start test server (Terminal 2)
+uvicorn tests.server:app --port 8080
+
+# 4. Run tests (Terminal 3)
+pytest tests/ -v
+```
+
+---
+
 ## Phase 1: Critical Fixes 🔴
 
 ### 1.1 Fix Login Proxy Injection
@@ -113,9 +152,52 @@
 
 ---
 
-## Phase 5: Cleanup 🧹
+## Phase 5: Test Mode 🧪 ✅
 
-### 5.1 Remove Legacy Action System
+### 5.1 Test Server
+- [x] Create FastAPI server (`tests/server.py`)
+- [x] Create 9 HTML test pages (one per action)
+- [x] Support `?scenario=suspended|locked|rate_limited|banned` query params
+- [x] Track per-session state (upvoted, followed, etc.)
+- [x] Provide `/api/state/{session}` endpoint for assertions
+- [x] Provide `/api/reset/{session}` for resetting state
+
+### 5.2 Test Mode Config
+- [x] Add `APP_MODE` env var (`production` | `test`)
+- [x] Add `TEST_SERVER_URL` env var (default `http://localhost:8080`)
+- [x] Add `is_test_mode` property to Settings
+
+### 5.3 URL Routing for Test Mode
+- [x] Add `_get_test_path()` method mapping action_type to test URL
+- [x] Modify `normalize_url()` to route to test server when `APP_MODE=test`
+
+### 5.4 Login Bypass for Test Mode
+- [x] Add `_fake_login()` method that creates session without Reddit
+- [x] Skip `_do_login_sync()` when `APP_MODE=test`
+
+### 5.5 Test Database & Fixtures
+- [x] Use separate `data/test.db` SQLite file
+- [x] Session-scoped DB (shared between tests)
+- [x] Auto-generate test accounts with real proxy format
+- [x] Auto-generate test workers
+- [x] `test_server` fixture to start/stop FastAPI server
+- [x] Session cleanup (removes test sessions from Camofox data dir)
+
+### 5.6 Pytest Suite
+- [x] Test all 9 actions with success scenario
+- [x] Test all 9 actions with failure scenarios (suspended, locked, etc.)
+- [x] Test deduplication
+- [x] Test parallel worker execution
+
+### 5.7 Tunnel Integration
+- [x] Temporary tunnel: `tests/start_tunnel.py` (trycloudflare.com)
+- [x] Permanent tunnel: `tests/start_permanent_tunnel.py` (reorchestra-test.vaproh.space)
+
+---
+
+## Phase 6: Cleanup 🧹
+
+### 6.1 Remove Legacy Action System
 - **Files:** `app/api/actions.py`, `app/services/action_service.py`
 - **Issue:** Duplicate action systems
 - **Breakdown:**
@@ -123,7 +205,7 @@
   - [ ] Remove legacy files
   - [ ] Update router to remove `/api/actions/*` routes
 
-### 5.2 Fix Technical Debt
+### 6.2 Fix Technical Debt
 - **Files:** Various
 - **Breakdown:**
   - [ ] Remove bare `except Exception` - catch specific exceptions
@@ -131,7 +213,7 @@
   - [ ] Make timeouts configurable in config
   - [ ] Fix thread-unsafe `QueueManager` with proper locking
 
-### 5.3 Testing
+### 6.3 Testing
 - **Files:** `tests/` directory
 - **Breakdown:**
   - [ ] Unit tests for `RateLimiter`
@@ -142,14 +224,13 @@
 
 ## Priority Order
 
-1. **1.1** (Proxy Fix) - Critical bug, accounts need proxies
-2. **1.3** (Parallel Workers) - Throughput improvement
-3. **1.2** (DB Sessions) - Stability
-4. **2.1** (RateLimiter) - Prevent account burning
-5. **3.1** (Dead Letter Queue) - Failed task visibility
+1. **5** (Test Mode) - Verify everything works without touching Reddit
+2. **1.2** (DB Sessions) - Stability
+3. **2.1** (RateLimiter) - Prevent account burning
+4. **3.1** (Dead Letter Queue) - Failed task visibility
+5. **3.2** (Graceful Shutdown) - Production reliability
 6. **4.1** (Dashboard) - UX for managing 500+ accounts
-7. **3.2** (Graceful Shutdown) - Production reliability
-8. **5** (Cleanup) - Technical debt
+7. **6** (Cleanup) - Technical debt
 
 ---
 

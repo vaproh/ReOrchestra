@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Comment {{ comment_id }}</title>
+</head>
+<body>
+    {% if scenario == 'banned' %}
+    <div id="header-banner" role="banner">
+        <p>You are banned from reddit</p>
+    </div>
+    {% endif %}
+    
+    <article class="single comment's thread">
+        <div class="comment">
+            <p>This is a simulated Reddit comment for testing.</p>
+        </div>
+    </article>
+    
+    <div class="vote-buttons">
+        <form action="/action/upvote/comment/{{ comment_id }}" method="post">
+            <input type="hidden" name="session" value="{{ session_key }}">
+            <button type="submit" aria-label="upvote" {% if comment_id in upvoted %}disabled{% endif %}>UPVOTE</button>
+        </form>
+    </div>
+    
+    {% if scenario == 'suspended' %}
+    <div id="popup" role="dialog">
+        <p>Your account has been suspended due to suspicious activity.</p>
+    </div>
+    {% endif %}
+    
+    {% if scenario == 'locked' %}
+    <div id="popup" role="dialog">
+        <p>This account has been locked for your protection.</p>
+    </div>
+    {% endif %}
+    
+    {% if scenario == 'rate_limited' %}
+    <div id="popup" role="dialog">
+        <p>You are doing that too much. Please wait and try again later.</p>
+    </div>
+    {% endif %}
+</body>
+</html>

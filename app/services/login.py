@@ -127,6 +127,11 @@ class LoginService:
                 logger.info(f"login | session_valid | username={username}")
                 return True, 0
 
+        settings = get_settings()
+        if settings.is_test_mode:
+            logger.info(f"login | test_mode | skipping | username={username}")
+            return self._fake_login(username, session_dir=self.session_dir)
+
         logger.info(f"login | attempting | username={username}")
 
         account_id = None
@@ -165,6 +170,21 @@ class LoginService:
             return data.get("logged_in", False)
         except Exception:
             return False
+
+    def _fake_login(self, username: str, session_dir: str) -> Tuple[bool, int]:
+        """Create fake session for test mode - no Reddit login needed."""
+        _save_session(
+            username,
+            session_dir,
+            {
+                "username": username,
+                "logged_in": True,
+                "url": "/",
+                "test_mode": True
+            }
+        )
+        logger.info(f"login | test_mode | fake_login | username={username}")
+        return True, 0
 
     async def login_with_session(self, username: str) -> bool:
         return self._validate_session(username)
