@@ -4,6 +4,7 @@ import time
 import random
 import asyncio
 import re
+import logging
 from typing import Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -11,6 +12,7 @@ from app.config import get_settings
 from app.services.browser import CamofoxClient
 
 settings = get_settings()
+logger = logging.getLogger("login")
 
 
 def _sleep(min_s: float, max_s: float):
@@ -54,6 +56,7 @@ def _do_login_sync(
         snapshot, _ = client.snapshot(tab)
         if "welcome back" in snapshot.lower() and "already logged in" in snapshot.lower():
             _save_session(username, session_dir, {"username": username, "logged_in": True, "url": "https://www.reddit.com/"})
+            logger.info(f"login | already_logged_in | username={username}")
             return True, 1000
 
         refs = _find_fields(snapshot)
@@ -77,11 +80,14 @@ def _do_login_sync(
         if "login" not in url.lower():
             # Login successful
             _save_session(username, session_dir, {"username": username, "logged_in": True, "url": url})
+            logger.info(f"login | success | username={username}")
             return True, 5000
 
+        logger.warning(f"login | failed | username={username} | reason=invalid_credentials")
         return False, 0
 
     except Exception as e:
+        logger.error(f"login | error | username={username} | error={e}")
         return False, 0
 
     finally:
@@ -113,8 +119,10 @@ class LoginService:
 
         if not force and os.path.exists(session_path):
             if self._validate_session(username):
+                logger.info(f"login | session_valid | username={username}")
                 return True, 0
 
+        logger.info(f"login | attempting | username={username}")
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             self._executor,

@@ -10,6 +10,7 @@ Manages the pool of workers (Reddit accounts) available for queue tasks:
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -20,6 +21,8 @@ from app.models import (
     Task, TaskActionLog, ActionOutcome,
 )
 from app.services.queue_actions import dedup_hash
+
+logger = logging.getLogger("worker_pool")
 
 
 class WorkerPool:
@@ -56,6 +59,7 @@ class WorkerPool:
         self.db.add(worker)
         self.db.commit()
         self.db.refresh(worker)
+        logger.info(f"worker_pool | create_worker | worker_id={worker.id} username={account.username}")
         return worker
 
     def create_workers_from_accounts(self) -> int:
@@ -77,6 +81,7 @@ class WorkerPool:
             self.db.add(worker)
             created += 1
         self.db.commit()
+        logger.info(f"worker_pool | create_workers_from_accounts | created={created}")
         return created
 
     def pause_worker(self, worker_id: int) -> Worker:
@@ -86,6 +91,7 @@ class WorkerPool:
         worker.status = WorkerStatus.paused
         self.db.commit()
         self.db.refresh(worker)
+        logger.info(f"worker_pool | pause_worker | worker_id={worker_id} username={worker.username}")
         return worker
 
     def resume_worker(self, worker_id: int) -> Worker:
@@ -96,6 +102,7 @@ class WorkerPool:
             worker.status = WorkerStatus.idle
         self.db.commit()
         self.db.refresh(worker)
+        logger.info(f"worker_pool | resume_worker | worker_id={worker_id} username={worker.username}")
         return worker
 
     # ------------------------------------------------------------------
@@ -149,6 +156,9 @@ class WorkerPool:
 
         task.workers_assigned = json.dumps(assigned_ids)
         self.db.commit()
+        if assigned:
+            worker_ids = [w.id for w in assigned]
+            logger.info(f"worker_pool | assign_workers | task_id={task.id} worker_ids={worker_ids}")
         return assigned
 
     def release_worker(self, worker_id: int, success: bool):
@@ -164,6 +174,7 @@ class WorkerPool:
         if worker.status == WorkerStatus.working:
             worker.status = WorkerStatus.idle
         self.db.commit()
+        logger.info(f"worker_pool | release_worker | worker_id={worker_id} success={success}")
 
     def mark_worker_suspended(self, worker_id: int):
         """Mark worker paused - account is suspended, needs manual intervention."""
@@ -173,6 +184,7 @@ class WorkerPool:
         worker.status = WorkerStatus.paused
         worker.current_task_id = None
         self.db.commit()
+        logger.warning(f"worker_pool | mark_worker_suspended | worker_id={worker_id} username={worker.username}")
 
     def mark_worker_dead(self, worker_id: int):
         """Mark worker paused - account is banned, cannot recover."""
@@ -186,3 +198,4 @@ class WorkerPool:
             worker.account.status = AccountStatus.dead
             worker.account.dead_reason = "manual_intervention_required:banned"
         self.db.commit()
+        logger.warning(f"worker_pool | mark_worker_dead | worker_id={worker_id} username={worker.username}")

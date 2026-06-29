@@ -34,10 +34,12 @@ class QueueManager:
         db = SessionLocal()
         self._processor = QueueProcessor(db, self.camofox)
         self._processor.start()
+        logger.info("queue_manager | start | processor_started")
 
     def stop(self):
         if self._processor:
             self._processor.stop()
+            logger.info("queue_manager | stop | processor_stopped")
         self._processor = None
 
     def is_running(self) -> bool:

@@ -1,5 +1,6 @@
 import json
 import time
+import logging
 import requests
 from typing import Optional
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 from app.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger("browser")
 
 
 @dataclass
@@ -30,6 +32,7 @@ class CamofoxClient:
         return f"{self.BASE_URL}{path}"
 
     def create_tab(self, url: str = "about:blank") -> Tab:
+        logger.debug(f"browser | create_tab | url={url}")
         resp = requests.post(self._url("/tabs"), json={
             "userId": self.user_id,
             "sessionKey": self.session_key,
@@ -37,6 +40,7 @@ class CamofoxClient:
         }, timeout=15)
         resp.raise_for_status()
         data = resp.json()
+        logger.debug(f"browser | create_tab | tab_id={data['tabId']}")
         return Tab(
             tab_id=data["tabId"],
             user_id=self.user_id,
@@ -44,6 +48,7 @@ class CamofoxClient:
         )
 
     def navigate(self, tab: Tab, url: str, wait: float = 5.0) -> str:
+        logger.debug(f"browser | navigate | tab_id={tab.tab_id} url={url}")
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/navigate"),
             json={"userId": tab.user_id, "url": url},
@@ -51,10 +56,13 @@ class CamofoxClient:
         )
         resp.raise_for_status()
         time.sleep(wait)
-        return resp.json().get("url", "")
+        result_url = resp.json().get("url", "")
+        logger.debug(f"browser | navigate | tab_id={tab.tab_id} result_url={result_url}")
+        return result_url
 
     def snapshot(self, tab: Tab) -> tuple[str, str]:
         """Returns (snapshot_text, current_url)"""
+        logger.debug(f"browser | snapshot | tab_id={tab.tab_id}")
         resp = requests.get(
             self._url(f"/tabs/{tab.tab_id}/snapshot"),
             params={"userId": tab.user_id},
@@ -62,9 +70,12 @@ class CamofoxClient:
         )
         resp.raise_for_status()
         data = resp.json()
+        snapshot_len = len(data.get("snapshot", ""))
+        logger.debug(f"browser | snapshot | tab_id={tab.tab_id} snapshot_len={snapshot_len}")
         return data.get("snapshot", ""), data.get("url", "")
 
     def type_text(self, tab: Tab, ref: str, text: str, delay: float = 0.5) -> None:
+        logger.debug(f"browser | type_text | tab_id={tab.tab_id} ref={ref} text_len={len(text)}")
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/type"),
             json={"userId": tab.user_id, "ref": ref, "text": text},
@@ -74,6 +85,7 @@ class CamofoxClient:
         time.sleep(delay)
 
     def click(self, tab: Tab, ref: str, delay: float = 2.0) -> None:
+        logger.debug(f"browser | click | tab_id={tab.tab_id} ref={ref}")
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/click"),
             json={"userId": tab.user_id, "ref": ref},
@@ -83,6 +95,7 @@ class CamofoxClient:
         time.sleep(delay)
 
     def scroll(self, tab: Tab, direction: str = "down", amount: int = 800, delay: float = 1.0) -> None:
+        logger.debug(f"browser | scroll | tab_id={tab.tab_id} direction={direction} amount={amount}")
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/scroll"),
             json={"userId": tab.user_id, "direction": direction, "amount": amount},
@@ -92,6 +105,7 @@ class CamofoxClient:
         time.sleep(delay)
 
     def close_tab(self, tab: Tab) -> None:
+        logger.debug(f"browser | close_tab | tab_id={tab.tab_id}")
         try:
             requests.delete(
                 self._url(f"/tabs/{tab.tab_id}"),
@@ -102,6 +116,7 @@ class CamofoxClient:
             pass
 
     def health(self) -> dict:
+        logger.debug("browser | health_check")
         resp = requests.get(self._url("/"), timeout=5)
         return resp.json()
 

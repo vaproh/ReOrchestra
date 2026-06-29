@@ -122,7 +122,7 @@ class QueueProcessor:
 
         for attempt in range(1, self.max_retries + 1):
             logger.info(
-                f"Task {task.id} worker {worker.id} attempt {attempt}/{self.max_retries}"
+                f"queue | task_attempt | task_id={task.id} worker_id={worker.id} attempt={attempt}/{self.max_retries}"
             )
             total_attempts = attempt
             result = action.execute(worker, task.target_url)
@@ -132,7 +132,7 @@ class QueueProcessor:
                 break
 
             if result.outcome == "popup_suspended":
-                logger.warning(f"Worker {worker.id} suspended - pausing")
+                logger.warning(f"queue | worker_suspended | worker_id={worker.id} task_id={task.id}")
                 self.pool.mark_worker_suspended(worker.id)
                 break
 
@@ -141,7 +141,7 @@ class QueueProcessor:
 
             if attempt < self.max_retries:
                 backoff = min(2 ** attempt, 30)
-                logger.info(f"Retrying in {backoff}s")
+                logger.info(f"queue | retry_backoff | task_id={task.id} worker_id={worker.id} backoff={backoff}s")
                 time.sleep(backoff)
 
         return {
@@ -158,7 +158,7 @@ class QueueProcessor:
         task.started_at = datetime.utcnow()
         self.db.commit()
 
-        logger.info(f"Processing task {task.id} ({task.action_type})")
+        logger.info(f"queue | task_start | task_id={task.id} action_type={task.action_type}")
 
         assigned_ids = json.loads(task.workers_assigned or "[]")
         failed_ids = json.loads(task.failed_workers or "[]")
@@ -167,7 +167,7 @@ class QueueProcessor:
         while len(assigned_ids) < task.workers_needed:
             assigned = self.pool.assign_workers(task, self.max_concurrent_per_task)
             if not assigned:
-                logger.info(f"No more idle workers for task {task.id}")
+                logger.info(f"queue | no_idle_workers | task_id={task.id}")
                 break
             assigned_ids = json.loads(task.workers_assigned or "[]")
 
@@ -223,7 +223,7 @@ class QueueProcessor:
         task.completed_at = datetime.utcnow()
         self.db.commit()
         logger.info(
-            f"Task {task.id} {task.status.value} - {succeeded} ok, {failed} failed"
+            f"queue | task_complete | task_id={task.id} status={task.status.value} succeeded={succeeded} failed={failed}"
         )
 
     # ------------------------------------------------------------------
@@ -236,11 +236,11 @@ class QueueProcessor:
         self._running = True
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
-        logger.info("Queue processor started")
+        logger.info("queue | processor_start")
 
     def stop(self):
         self._running = False
-        logger.info("Queue processor stopped")
+        logger.info("queue | processor_stop")
 
     def is_running(self) -> bool:
         return self._running
