@@ -1,657 +1,805 @@
-# Reddit Automation API - Implementation Plan
+# Reddit Automation API - Implementation Guide (V0.8)
 
 ## Overview
 
-A scalable Reddit account management and karma automation system. Built with FastAPI, Camofox browser automation, and SQLite. Manages 5 to 1,000 accounts with sticky proxy-per-account assignment and detection avoidance.
+This guide covers setup, configuration, API usage, and operation of the Reddit Automation API system.
+
+**Version:** 0.8
 
 ---
 
-## 1. Architecture
+## 1. Setup Instructions
 
-### 1.1 System Design
+### 1.1 Prerequisites
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Reddit API (Python/FastAPI)                    │
-│                                                                      │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                    API Layer                                    │  │
-│  │  /api/accounts/*  │  /api/actions/*  │  /api/proxies/*       │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                                                                      │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                  Service Layer                                  │  │
-│  │  AccountService  │  ActionService  │  ProxyService          │  │
-│  │  SlotManager     │  RateLimiter   │  BurnDetector           │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                                                                      │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │              Camofox Client (Python)                          │  │
-│  │  userId = "s_{account_id}"  ←  decoupled from username      │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-         │
-         │  REST API
-         ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                 Camofox Browser Server (Node.js)                     │
-│                                                                      │
-│  ONE instance on port 9377                                          │
-│  MAX_SESSIONS = 50 (configurable)                                   │
-│                                                                      │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │  sticky-proxy plugin                                          │  │
-│  │  userProxyMap: { "s_1" → proxy_config, ... }  ← IN-MEMORY  │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                                                                      │
-│  Sessions (via persistence plugin):                                 │
-│    ~/.camofox/profiles/{hashed_userId}/storage_state.json          │
-│    → Cookies + localStorage, persists on restart                     │
-│                                                                      │
-│  Each session = one userId = one account = one proxy                │
-└─────────────────────────────────────────────────────────────────────┘
+- Python 3.9+
+- Camofox browser server running on port 9377
+- SQLite (included with Python)
+
+### 1.2 Installation
+
+```bash
+# Navigate to project directory
+cd reddit-api
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or: venv\Scripts\activate  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create data directories
+mkdir -p data/sessions data/logs
 ```
 
-### 1.2 Data Flow
+### 1.3 Camofox Setup
 
-```
-Import Accounts (CSV)
-    ↓
-Create Account rows in DB (status=fresh)
+The system requires Camofox browser server. Use the provided setup script:
 
-Import Proxies (CSV)
-    ↓
-Create Proxy rows + auto-assign 1:1 to accounts (proxy[i] → account[i])
-
-Push Proxy to Camofox (per action)
-    ↓
-POST /users/{userId}/proxy
-    ↓
-Camofox stores in userProxyMap (IN-MEMORY)
-
-Login / Vote Action
-    ↓
-CamofoxClient.create_tab(userId="s_{account_id}")
-    ↓
-sticky-proxy plugin intercepts session:creating
-    ↓
-Injects proxy from userProxyMap into browser context
-    ↓
-Reddit login/vote with correct proxy
-    ↓
-Session cookies saved to disk (persistence plugin)
+```bash
+chmod +x setup_camofox.sh
+./setup_camofox.sh
 ```
 
-### 1.3 Session Lifecycle
-
+Or manually start Camofox:
+```bash
+# Default port is 9377
+camofox --port 9377
 ```
-First Use:
-  push_proxy(userId, proxy) → create_tab(userId) → login → cookies saved
 
-Subsequent Use:
-  push_proxy(userId, proxy) → create_tab(userId) → cookies loaded → vote
+### 1.4 Configuration
 
-After Camofox Restart:
-  push_proxy(userId, proxy) → create_tab(userId) → cookies on disk intact → resume
+Copy `.env.example` to `.env` and adjust as needed:
+```bash
+cp .env.example .env
+```
+
+Key environment variables:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./data/reddit.db` | Database path |
+| `SESSION_DIR` | `data/sessions` | Cookie storage |
+| `CAMOFOX_PORT` | `9377` | Camofox server port |
+| `LOG_LEVEL` | `INFO` | Logging level |
+
+### 1.5 Running the Server
+
+```bash
+# Start the API server
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Access the API
+# - API docs: http://localhost:8000/docs
+# - GUI dashboard: http://localhost:8000/gui
 ```
 
 ---
 
-## 2. Database Models
+## 2. API Endpoints Reference
 
-### 2.1 Account
+Base URL: `http://localhost:8000/api`
 
-```sql
-CREATE TABLE accounts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username VARCHAR(20) UNIQUE NOT NULL,
-    password VARCHAR(128) NOT NULL,
-    email VARCHAR(128),
-    proxy_id INTEGER REFERENCES proxies(id),
+### 2.1 Account Endpoints
 
-    status VARCHAR(20) DEFAULT 'fresh',
-    -- 'fresh', 'logged_in', 'session_expired', 'banned', 'dead'
+#### Import Accounts
+```
+POST /api/accounts/import
+```
+Import multiple accounts at once.
 
-    votes_today INTEGER DEFAULT 0,
-    votes_this_week INTEGER DEFAULT 0,
-    total_votes INTEGER DEFAULT 0,
-    last_vote_at TIMESTAMP,
-
-    fail_count INTEGER DEFAULT 0,
-    consecutive_failures INTEGER DEFAULT 0,
-    last_failure_at TIMESTAMP,
-
-    last_used TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    INDEX idx_status (status),
-    INDEX idx_proxy (proxy_id)
-);
+**Request:**
+```json
+{
+  "accounts": [
+    {
+      "username": "user1",
+      "password": "pass123",
+      "email": "user1@email.com",
+      "email_password": "email_pass",
+      "proxy": "http://user:pass@host:port",
+      "profile_id": "win10-in"
+    }
+  ],
+  "account_type": "upvoter"
+}
 ```
 
-### 2.2 Proxy
-
-```sql
-CREATE TABLE proxies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    proxy_string VARCHAR(512) NOT NULL,
-    account_id INTEGER UNIQUE REFERENCES accounts(id),
-    status VARCHAR(20) DEFAULT 'active',
-
-    fail_count INTEGER DEFAULT 0,
-    last_used TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    INDEX idx_account (account_id),
-    INDEX idx_status (status)
-);
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "imported": 10,
+    "skipped": 0,
+    "accounts": [...],
+    "errors": []
+  }
+}
 ```
 
-### 2.3 ActionLog
-
-```sql
-CREATE TABLE action_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
-
-    action_type VARCHAR(20) NOT NULL,
-    -- 'upvote', 'downvote', 'comment_upvote', 'comment_downvote', 'comment', 'login'
-
-    target_id VARCHAR(64),
-    target_url TEXT,
-
-    success BOOLEAN NOT NULL,
-    error TEXT,
-    http_status INTEGER,
-
-    started_at TIMESTAMP,
-    completed_at TIMESTAMP,
-    duration_ms INTEGER,
-
-    dedup_hash VARCHAR(64) UNIQUE,
-
-    INDEX idx_account (account_id),
-    INDEX idx_action_type (action_type),
-    INDEX idx_created (created_at)
-);
+#### List Accounts
+```
+GET /api/accounts?status=alive&type=upvoter&search=user&page=1&per_page=50
 ```
 
-### 2.4 Config
+Query parameters:
+- `status` - Filter by status: `fresh`, `logged_in`, `session_expired`, `banned`, `dead`, `alive`
+- `type` - Filter by type: `upvoter`, `main`, `both`
+- `search` - Search username
+- `sort` - Sort field (default: `id`)
+- `order` - `asc` or `desc` (default: `desc`)
+- `page` - Page number (default: 1)
+- `per_page` - Results per page (default: 50, max: 200)
 
-```sql
-CREATE TABLE config (
-    key VARCHAR(64) PRIMARY KEY,
-    value TEXT,
-    source VARCHAR(20) DEFAULT 'runtime',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+#### Get Account
+```
+GET /api/accounts/{account_id}
+```
+
+#### Update Account
+```
+PATCH /api/accounts/{account_id}
+```
+Update account fields (status, account_type, proxy, etc.)
+
+#### Delete Account
+```
+DELETE /api/accounts/{account_id}
+```
+
+#### Batch Delete
+```
+POST /api/accounts/batch-delete
+```
+```json
+{
+  "ids": [1, 2, 3]  // OR
+  "filters": {"status": "dead", "type": "upvoter"}
+}
+```
+
+#### Login Accounts
+```
+POST /api/accounts/login
+```
+```json
+{
+  "account_ids": [1, 2, 3],
+  "force": false,
+  "options": {"headless": false}
+}
+```
+
+#### Simple Login
+```
+POST /api/accounts/login/simple
+```
+Login with username/password directly (no account ID needed).
+```json
+{
+  "username": "user1",
+  "password": "pass123",
+  "headless": false
+}
+```
+
+#### Batch Login
+```
+POST /api/accounts/login/batch
+```
+```json
+{
+  "filters": {"status": "fresh"},
+  "force": false,
+  "options": {"headless": false}
+}
+```
+
+#### Check Session
+```
+GET /api/accounts/{account_id}/session
 ```
 
 ---
 
-## 3. Configuration
+### 2.2 Action Endpoints
 
-### 3.1 Config Files
+#### Upvote
+```
+POST /api/actions/upvote
+```
+```json
+{
+  "account_ids": [1, 2, 3],
+  "target_url": "https://www.reddit.com/r/subreddit/comments/abc123/title/",
+  "random_order": true
+}
+```
 
-| File | Purpose |
-|------|---------|
-| `config/default.yaml` | All defaults |
-| `config/custom.yaml` | User overrides (gitignored) |
+Alternative filters:
+```json
+{
+  "filters": {"status": "logged_in", "type": "upvoter"},
+  "target_url": "https://www.reddit.com/..."
+}
+```
 
-### 3.2 Default Config (`config/default.yaml`)
+Or single account by username:
+```json
+{
+  "username": "user1",
+  "target_url": "https://www.reddit.com/..."
+}
+```
+
+#### Downvote
+```
+POST /api/actions/downvote
+```
+Same format as upvote.
+
+---
+
+### 2.3 Proxy Endpoints
+
+#### List Proxies
+```
+GET /api/proxies?status=active&assigned=true
+```
+
+#### Import Proxies
+```
+POST /api/proxies/import
+```
+```json
+{
+  "proxies": [
+    "http://user:pass@host:port",
+    "host:port:username:password"
+  ]
+}
+```
+
+#### Replace Dead Proxies
+```
+POST /api/proxies/replace
+```
+Replace dead proxies with new ones (maintains count).
+```json
+{
+  "proxies": ["http://new:proxy@host:port", ...]
+}
+```
+
+#### Delete Proxy
+```
+DELETE /api/proxies/{proxy_id}
+```
+
+#### Mark Proxy Dead
+```
+POST /api/proxies/mark-dead
+```
+```json
+{
+  "proxy_id": 123,
+  "error": "connection_timeout"
+}
+```
+
+---
+
+### 2.4 Admin Endpoints
+
+#### Health Check
+```
+GET /api/admin/health
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "status": "ok",
+    "version": "1.0.0",
+    "timestamp": "2024-...",
+    "camofox": {"connected": true, "port": 9377},
+    "vnc": {"enabled": false, "port": 5999}
+  }
+}
+```
+
+#### Statistics
+```
+GET /api/admin/stats
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "accounts": {
+      "total": 100,
+      "active": 85,
+      "dead": 15,
+      "by_type": {"upvoter": 80, "main": 15, "both": 5},
+      "by_status": {"fresh": 10, "logged_in": 75, ...}
+    },
+    "actions": {
+      "today": 150,
+      "this_week": 1000,
+      "this_month": 4500,
+      "by_type": {"upvote": 4000, "downvote": 500}
+    },
+    "posts": {...},
+    "slots": {...}
+  }
+}
+```
+
+---
+
+### 2.5 Queue Worker Endpoints
+
+#### List Workers
+```
+GET /api/workers?status=idle
+```
+
+#### Get Worker
+```
+GET /api/workers/{worker_id}
+```
+
+#### Create Worker
+```
+POST /api/workers
+```
+```json
+{
+  "account_id": 1
+}
+```
+
+#### Bulk Create Workers
+```
+POST /api/workers/bulk
+```
+Creates workers for all logged-in accounts.
+
+#### Pause Worker
+```
+POST /api/workers/{worker_id}/pause
+```
+
+#### Resume Worker
+```
+POST /api/workers/{worker_id}/resume
+```
+
+---
+
+### 2.6 Queue Task Endpoints
+
+#### List Tasks
+```
+GET /api/tasks?status=queued
+```
+Status filter: `queued`, `running`, `completed`, `partial`, `failed`, `cancelled`
+
+#### Create Task
+```
+POST /api/tasks
+```
+```json
+{
+  "action_type": "upvote_post",
+  "target_url": "https://www.reddit.com/r/sub/comments/abc123/title/",
+  "workers_needed": 5
+}
+```
+
+**Supported action_types:**
+- `upvote_post`
+- `downvote_post`
+- `upvote_comment`
+- `downvote_comment`
+- `follow_user`
+- `unfollow_user`
+- `join_subreddit`
+- `leave_subreddit`
+- `save_post`
+
+#### Get Task
+```
+GET /api/tasks/{task_id}
+```
+Returns task details with action logs.
+
+#### Cancel Task
+```
+POST /api/tasks/{task_id}/cancel
+```
+
+#### Boost Priority
+```
+POST /api/tasks/{task_id}/priority
+```
+
+---
+
+### 2.7 Queue Control Endpoints
+
+#### View Queue
+```
+GET /api/queue
+```
+Lists all queued and running tasks.
+
+#### Start Queue Processor
+```
+POST /api/queue/start
+```
+
+#### Stop Queue Processor
+```
+POST /api/queue/stop
+```
+
+#### Queue Status
+```
+GET /api/queue/status
+```
+
+---
+
+## 3. Queue System Usage
+
+### 3.1 Overview
+
+The queue system allows scalable, distributed task processing. Instead of executing actions directly, you create tasks that are processed by a pool of workers in the background.
+
+### 3.2 Workflow
+
+1. **Create workers** from your logged-in accounts
+2. **Create tasks** specifying the action and target
+3. **Start the queue processor**
+4. **Monitor progress** via API
+
+### 3.3 Example: Upvote with Queue
+
+```bash
+# Step 1: Ensure accounts are logged in
+curl -X POST http://localhost:8000/api/accounts/login/batch \
+  -H "Content-Type: application/json" \
+  -d '{"filters": {"status": "logged_in"}, "force": false}'
+
+# Step 2: Create workers for all logged-in accounts
+curl -X POST http://localhost:8000/api/workers/bulk
+
+# Step 3: Create an upvote task
+curl -X POST http://localhost:8000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_type": "upvote_post",
+    "target_url": "https://www.reddit.com/r/askreddit/comments/abc123/title/",
+    "workers_needed": 10
+  }'
+
+# Step 4: Start the queue processor
+curl -X POST http://localhost:8000/api/queue/start
+
+# Step 5: Monitor the task
+curl http://localhost:8000/api/tasks/1
+
+# Step 6: Stop when done
+curl -X POST http://localhost:8000/api/queue/stop
+```
+
+### 3.4 Deduplication
+
+The queue system prevents duplicate actions:
+- Each worker can only succeed at an action on a target once
+- Failed attempts can be retried
+- `duplicate` outcome means worker already succeeded
+
+### 3.5 Worker States
+
+| State | Description |
+|-------|-------------|
+| `idle` | Available for task assignment |
+| `working` | Currently executing a task |
+| `paused` | Manually paused, not available |
+
+### 3.6 Task States
+
+| State | Description |
+|-------|-------------|
+| `queued` | Waiting in queue |
+| `running` | Currently being processed |
+| `completed` | All workers succeeded |
+| `partial` | Some workers succeeded |
+| `failed` | All workers failed |
+| `cancelled` | Manually cancelled |
+
+---
+
+## 4. Creating Tasks and Managing Workers
+
+### 4.1 Worker Pool Management
+
+Workers are created from existing logged-in accounts:
+
+```bash
+# Create single worker
+curl -X POST http://localhost:8000/api/workers \
+  -d '{"account_id": 1}'
+
+# Create workers for all logged-in accounts
+curl -X POST http://localhost:8000/api/workers/bulk
+
+# List workers
+curl http://localhost:8000/api/workers
+
+# Pause a worker (e.g., if account has issues)
+curl -X POST http://localhost:8000/api/workers/1/pause
+
+# Resume worker
+curl -X POST http://localhost:8000/api/workers/1/resume
+```
+
+### 4.2 Task Execution
+
+When a task is created:
+1. It enters `queued` status
+2. Queue processor assigns idle workers
+3. Each worker executes the action via Camofox
+4. Results are logged
+5. Task status updates to `completed`/`partial`/`failed`
+
+### 4.3 Action Outcomes
+
+| Outcome | Description |
+|---------|-------------|
+| `success` | Action completed successfully |
+| `failed` | Action failed |
+| `duplicate` | Worker already did this action |
+| `popup_suspended` | Reddit suspended the account (popup) |
+| `popup_rate_limited` | Rate limited (popup) |
+| `header_suspended` | Account suspended (header banner) |
+| `header_banned` | Account banned (header banner) |
+
+---
+
+## 5. Configuration Options
+
+### 5.1 Configuration Files
+
+| File | Purpose | Gitignored |
+|------|---------|------------|
+| `config/default.yaml` | Default values | No |
+| `config/custom.yaml` | Overrides | **Yes** |
+| `config/proxies.yaml` | Proxy settings | **Yes** |
+
+### 5.2 Config Loading Priority
+
+1. Runtime overrides (via API)
+2. `config/custom.yaml`
+3. `config/default.yaml`
+
+### 5.3 Default Configuration (config/default.yaml)
 
 ```yaml
+app:
+  name: "Reddit Automation API"
+  version: "1.0.0"
+
 rate_limits:
   max_votes_per_day: 15
   max_votes_per_week: 100
   min_seconds_between_votes: 120
+  max_vote_only_ratio: 0.3
 
 concurrency:
-  max_sessions: 50          # Max Camofox sessions per instance
   max_concurrent_per_slot: 10
+  slots_auto_scale: true
+  accounts_per_slot: 50
 
 timing:
-  jitter_sigma: 120         # Gaussian jitter std dev (seconds)
-  skip_cycle_chance: 0.08   # 8% chance to skip vote
-  clump_chance: 0.15        # 15% chance to vote sooner
+  jitter_sigma: 120
+  skip_cycle_chance: 0.08
+  clump_chance: 0.15
+  micro_jitter_min_ms: 100
+  micro_jitter_max_ms: 900
 
 s_curve:
   enabled: true
-  initial_burst: 0.30       # 30% in first 30 min
-  peak: 0.45               # 45% in 30min-2h
-  decay: 0.20              # 20% in 2-4h
-  tail: 0.05               # 5% after 4h
+  initial_burst: 0.30
+  peak: 0.45
+  decay: 0.20
+  tail: 0.05
+
+activation:
+  batch_size: 50
+  spread_days: 3
 
 burn_detection:
-  consecutive_failures: 5   # Mark dead after N failures
+  consecutive_failures: 5
   rate_limit_backoff_hours: 24
   success_rate_threshold: 0.8
 
 session:
   max_age_hours: 72
   refresh_before_hours: 12
+
+account_limits:
+  max_fail_count: 10
+  dead_after_ban: true
+
+logging:
+  level: "INFO"
+  file: "data/logs/app.log"
+  max_bytes: 10485760
+  backup_count: 5
+```
+
+### 5.4 Settings (Environment Variables)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./data/reddit.db` | Database connection |
+| `SESSION_DIR` | `data/sessions` | Session cookie storage |
+| `LOG_DIR` | `data/logs` | Log file location |
+| `MAX_SESSION_AGE_HOURS` | `72` | Session expiry |
+| `CAMOFOX_PORT` | `9377` | Camofox server port |
+| `VNC_ENABLED` | `false` | Enable VNC |
+| `VNC_PORT` | `5999` | VNC port |
+
+---
+
+## 6. Troubleshooting
+
+### 6.1 Common Issues
+
+#### Camofox Connection Failed
+```
+Error: Cannot connect to Camofox at localhost:9377
+```
+**Solution:** Ensure Camofox server is running:
+```bash
+camofox --port 9377
+```
+
+#### Login Failed
+- Check username/password are correct
+- Verify proxy is working
+- Check if account is banned
+- Ensure Camofox is running
+
+#### Task Stuck in Running
+- Check workers are available (not all paused)
+- Restart queue processor:
+```bash
+curl -X POST http://localhost:8000/api/queue/stop
+curl -X POST http://localhost:8000/api/queue/start
+```
+
+#### All Actions Failing
+- Check account status (`/api/accounts/{id}`)
+- Verify session is valid (`/api/accounts/{id}/session`)
+- Check proxy is working
+- Review BurnDetector status
+
+### 6.2 API Error Codes
+
+| Code | Description |
+|------|-------------|
+| `INTERNAL_ERROR` | Unhandled exception |
+| `ACCOUNT_NOT_FOUND` | Account ID doesn't exist |
+| `WORKER_NOT_FOUND` | Worker ID doesn't exist |
+| `TASK_NOT_FOUND` | Task ID doesn't exist |
+| `INVALID_ACTION_TYPE` | Action type not supported |
+| `NO_ACCOUNTS` | No accounts matched filters |
+
+### 6.3 Logging
+
+Logs are written to `data/logs/app.log`. Check there for detailed error information.
+
+```bash
+# View recent logs
+tail -f data/logs/app.log
+
+# Increase verbosity
+# Set LOG_LEVEL=DEBUG in .env
+```
+
+### 6.4 Database Inspection
+
+```bash
+# Using sqlite3
+sqlite3 data/reddit.db
+
+# List tables
+sqlite> .tables
+
+# View account status
+sqlite> SELECT id, username, status FROM accounts;
+
+# View queue tasks
+sqlite> SELECT id, action_type, status, workers_needed, workers_completed FROM queue_tasks;
 ```
 
 ---
 
-## 4. Camofox Plugin: `sticky-proxy`
+## 7. Service Details
 
-### 4.1 Purpose
+### 7.1 LoginService
 
-Inject a specific proxy into each Camofox session based on `userId`.
+Handles browser-based Reddit login via Camofox:
 
-### 4.2 Location
+1. Creates Camofox tab
+2. Navigates to old.reddit.com/login
+3. Checks for existing session
+4. Fills credentials if needed
+5. Saves session cookies
 
-```
-camofox-browser/plugins/sticky-proxy/
-└── index.js
-```
+### 7.2 ActionService
 
-### 4.3 Logic
+Browser-based voting:
 
-```javascript
-// In-memory map: userId → proxy config
-const userProxyMap = new Map();
+1. Creates/uses existing session
+2. Navigates to target URL
+3. Scrolls to find upvote/downvote button
+4. Clicks the button
+5. Verifies success
 
-// Hook: before session is created, inject that user's proxy
-events.on('session:creating', async ({ userId, contextOptions }) => {
-  const proxy = userProxyMap.get(userId)
-  if (proxy) {
-    contextOptions.proxy = {
-      server: `http://${proxy.host}:${proxy.port}`,
-      username: proxy.username,
-      password: proxy.password,
-    }
-  }
-})
+### 7.3 RateLimiter
 
-// API: Push proxy config for a userId
-app.post('/users/:userId/proxy', (req, res) => {
-  const { host, port, username, password } = req.body
-  userProxyMap.set(req.params.userId, { host, port, username, password })
-  res.json({ ok: true, userId: req.params.userId })
-})
+Per-account vote limiting:
+- Tracks votes per day/week
+- Enforces cooldown between votes
+- Checks active hours
+- Monitors vote-only ratio
 
-// API: Get proxy config for a userId
-app.get('/users/:userId/proxy', (req, res) => {
-  const proxy = userProxyMap.get(req.params.userId)
-  res.json(proxy || null)
-})
+### 7.4 BurnDetector
 
-// API: Delete proxy config for a userId
-app.delete('/users/:userId/proxy', (req, res) => {
-  userProxyMap.delete(req.params.userId)
-  res.json({ ok: true })
-})
-```
+Account health monitoring:
+- Tracks consecutive failures
+- Detects bans (401/403)
+- Detects rate limits (429)
+- Marks accounts as dead when thresholds exceeded
 
-### 4.4 Proxy Format
+### 7.5 QueueProcessor
 
-Proxy string from DB: `http://user:pass_session-ABC123_lifetime-40@gateway.evomi.com:1000`
+Background task processor:
+- Runs in separate thread
+- Processes tasks FIFO (priority first)
+- Assigns workers to tasks
+- Handles retries with exponential backoff
+- Updates task status on completion
 
-Parsed into:
-```
-host: gateway.evomi.com
-port: 1000
-username: user
-password: pass_session-ABC123_lifetime-40
-```
+### 7.6 WorkerPool
 
-### 4.5 Camofox Session Naming
-
-Camofox `userId` = `s_{account_id}` (not username)
-
-```
-account_id=1  → userId="s_1"
-account_id=42 → userId="s_42"
-```
-
-This decouples Camofox session from Reddit username.
+Worker lifecycle management:
+- Creates workers from accounts
+- Assigns idle workers to tasks
+- Tracks worker status
+- Handles deduplication
+- Manages worker pause/resume
 
 ---
 
-## 5. API Endpoints
+## 8. GUI Dashboard
 
-### 5.1 Accounts
+Access the web-based dashboard at `/gui`:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/accounts` | List accounts (paginated) |
-| GET | `/api/accounts/{id}` | Get single account |
-| POST | `/api/accounts/import` | Bulk import accounts |
-| POST | `/api/accounts/login` | Login accounts |
-| PATCH | `/api/accounts/{id}` | Update account |
-| DELETE | `/api/accounts/{id}` | Delete account |
+- Account overview
+- Action statistics
+- Queue status
+- Proxy management
 
-### 5.2 Proxies
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/proxies` | List proxies |
-| POST | `/api/proxies/import` | Bulk import proxies |
-| POST | `/api/proxies/assign` | Assign proxies to accounts (1:1) |
-
-### 5.3 Actions
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/actions/upvote` | Upvote with accounts |
-| POST | `/api/actions/downvote` | Downvote with accounts |
-
-### 5.4 Admin
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/admin/health` | System health |
-| GET | `/api/admin/stats` | Dashboard statistics |
-| GET | `/api/admin/config` | Get config |
-| PUT | `/api/admin/config` | Update runtime config |
-
----
-
-## 6. Services
-
-### 6.1 ProxyService
-
-```python
-class ProxyService:
-    def import_bulk_accounts(csv_lines: list[str]) -> tuple[int, int]
-        # Parse: username,password
-        # Create Account rows
-        # Return: (imported, skipped)
-
-    def import_bulk_proxies(csv_lines: list[str]) -> tuple[int, int]
-        # Parse: proxy_string
-        # Create Proxy rows (unassigned)
-        # Return: (imported, skipped)
-
-    def import_combined(csv_lines: list[str]) -> tuple[int, int]
-        # Parse: username,password,proxy_string,email(optional)
-        # Create Account + Proxy + assign 1:1
-        # Return: (imported, skipped)
-
-    def auto_assign_proxies_to_accounts() -> None
-        # Find unassigned proxies (ordered by id)
-        # Find unassigned accounts (ordered by id)
-        # Assign proxy[i] → account[i]
-        # Raise if counts don't match
-
-    def push_proxy_to_camofox(userId: str, proxy_string: str) -> bool
-        # Parse proxy_string → host, port, username, password
-        # POST /users/{userId}/proxy → Camofox
-        # Return: success
-
-    def get_proxy_for_account(account_id: int) -> Proxy
-        # Return assigned proxy from DB
-```
-
-### 6.2 AccountService
-
-```python
-class AccountService:
-    def login(account_id: int, force: bool = False) -> tuple[bool, str]
-        # 1. Get account + proxy from DB
-        # 2. Push proxy to Camofox: push_proxy_to_camofox("s_{id}", proxy_string)
-        # 3. Create Camofox tab with userId="s_{id}"
-        # 4. Navigate to old.reddit.com/login
-        # 5. Check "already logged in" dialog
-        # 6. If not logged in: fill credentials, click login
-        # 7. Save session (Camofox persistence handles this)
-        # 8. Update account status
-
-    def resume_session(account_id: int) -> bool
-        # 1. Push proxy to Camofox
-        # 2. Create tab with userId="s_{id}"
-        # 3. Camofox loads existing cookies from disk
-        # 4. Return: tab created successfully
-
-    def check_session_valid(account_id: int) -> bool
-        # Create temp tab, check if logged in, close tab
-
-    def get_account(account_id: int) -> Account
-    def list_accounts(filters: dict) -> list[Account]
-    def delete_account(account_id: int) -> bool
-```
-
-### 6.3 RateLimiter
-
-```python
-class RateLimiter:
-    def check(account: Account) -> tuple[bool, str]
-        # Check votes_today < max_votes_per_day
-        # Check votes_this_week < max_votes_per_week
-        # Check seconds_since_last_vote >= min_seconds_between_votes
-        # Check within active hours (7-23)
-        # Return: (allowed, reason_if_blocked)
-
-    def record_vote(account: Account) -> None
-        # Increment votes_today, votes_this_week, total_votes
-        # Update last_vote_at
-        # Reset counters at midnight/week boundaries
-```
-
-### 6.4 BurnDetector
-
-```python
-class BurnDetector:
-    def record_result(account: Account, success: bool, error: str, http_status: int)
-        # If success: reset consecutive_failures
-        # If failure: increment consecutive_failures
-        # If consecutive_failures >= 5: mark dead
-        # If 401/403: mark banned
-        # If 429: mark rate_limited, backoff
-
-    def check_success_rate(account: Account) -> float
-        # Return success rate over last 7 days
-
-    def mark_if_dead(account: Account) -> bool
-        # If fail_count >= 10: mark dead
-        # If success_rate < 0.8: mark dead
-```
-
-### 6.5 SlotManager
-
-```python
-class SlotManager:
-    # Note: For now, we use ONE Camofox instance
-    # This manages the connection and health checking
-
-    def get_slot_stats() -> dict
-        # Return: {total, running, stopped, max_concurrent, total_capacity}
-```
-
----
-
-## 7. Voting Flow
-
-### 7.1 Upvote Action
-
-```
-POST /api/actions/upvote
-{
-  "account_ids": [1, 2, 3],
-  "target_url": "https://old.reddit.com/r/.../comments/xxx/title/"
-}
-
-↓
-
-For each account (async, concurrent):
-  1. Check rate limit (RateLimiter.check)
-  2. Check session valid (or re-login)
-  3. Push proxy to Camofox
-  4. Create tab (userId="s_{account_id}")
-  5. Navigate to target_url
-  6. Scroll to find upvote button
-  7. Click upvote
-  8. Close tab
-  9. Record vote (RateLimiter.record_vote)
-  10. Record result (BurnDetector.record_result)
-```
-
-### 7.2 Per-Account Timing
-
-```
-Vote happens at T+0
-Tab stays open T+0 to T+120 (2 min cooldown)
-Close tab at T+120
-Next vote on same account: earliest T+120
-```
-
-During the 2-min window, account is "busy" (tab open). Other accounts can still vote concurrently up to MAX_SESSIONS limit.
-
----
-
-## 8. Import Workflows
-
-### 8.1 Separate Imports (Auto-assign by Index)
-
-```
-Step 1: POST /api/accounts/import
-  CSV:
-    username,password
-    alice,pass123
-    bob,pass456
-    charlie,pass789
-  → Creates 3 accounts (fresh)
-
-Step 2: POST /api/proxies/import
-  CSV:
-    proxy_string
-    http://user:pass_session-A@gateway:1000
-    http://user:pass_session-B@gateway:1000
-    http://user:pass_session-C@gateway:1000
-  → Creates 3 proxies (unassigned)
-
-Step 3: POST /api/proxies/assign
-  → Auto-assigns: proxy[1]→account[1], proxy[2]→account[2], etc.
-```
-
-### 8.2 Combined Import (One-step)
-
-```
-POST /api/accounts/import
-CSV:
-  username,password,proxy_string,email
-  alice,pass123,http://user:pass_session-A@gateway:1000
-  bob,pass456,http://user:pass_session-B@gateway:1000
-  charlie,pass789,http://user:pass_session-C@gateway:1000
-→ Creates accounts + proxies + assigns 1:1 in one step
-```
-
----
-
-## 9. File Structure
-
-```
-reddit-api/
-├── config/
-│   ├── default.yaml
-│   └── custom.yaml
-│
-├── camofox/                           # Forked/Patched Camofox
-│   └── plugins/
-│       └── sticky-proxy/
-│           └── index.js
-│
-├── app/
-│   ├── main.py
-│   ├── config.py
-│   ├── database.py
-│   │
-│   ├── models/
-│   │   └── __init__.py
-│   │
-│   ├── schemas/
-│   │   ├── account.py
-│   │   ├── action.py
-│   │   ├── proxy.py
-│   │   └── common.py
-│   │
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── config_service.py
-│   │   ├── proxy_service.py
-│   │   ├── account_service.py
-│   │   ├── actions.py
-│   │   ├── rate_limiter.py
-│   │   ├── burn_detector.py
-│   │   ├── slot_manager.py
-│   │   └── sticky_proxy.py        # Push proxy to Camofox
-│   │
-│   ├── api/
-│   │   ├── accounts.py
-│   │   ├── actions.py
-│   │   ├── proxies.py
-│   │   └── admin.py
-│   │
-│   └── gui.py
-│
-├── data/
-│   ├── reddit.db
-│   ├── sessions/
-│   └── logs/
-│
-└── requirements.txt
-```
-
----
-
-## 10. Implementation Order
-
-### Phase 1: Foundation
-1. Fork/clone Camofox browser
-2. Create `sticky-proxy` plugin
-3. Test plugin manually
-
-### Phase 2: Database & Config
-4. Update database models
-5. Create ConfigService for YAML loading
-
-### Phase 3: Core Services
-6. ProxyService (import, assign, push to Camofox)
-7. StickyProxy Python client (push proxy to Camofox)
-8. AccountService (login, session resume)
-9. RateLimiter + BurnDetector
-
-### Phase 4: Actions
-10. Action flow (upvote/downvote with session management)
-11. API endpoints
-
-### Phase 5: GUI
-12. Update dashboard
-
----
-
-## 11. Questions & Decisions
-
-| Question | Decision |
-|----------|----------|
-| Camofox session naming | `s_{account_id}` (decoupled from username) |
-| Proxy storage | DB is source of truth; Camofox holds in-memory only |
-| Proxy persistence | Proxy pushed to Camofox on every action (survives restart) |
-| Concurrent votes | Hardware-limited (RAM/CPU) |
-| Vote cooldown | 2 min tab-open, then close |
-| On ban | Status → `banned` |
-| Account type | Removed (all accounts can do all actions) |
-| Total votes | Added (`total_votes` cumulative counter) |
-| Import: accounts | CSV: `username,password` |
-| Import: proxies | CSV: `proxy_string` |
-| Import: combined | CSV: `username,password,proxy_string,email` |
-| Proxy assign | Auto 1:1 by import order |
-
----
-
-## 12. Detection Avoidance Summary
-
-| Technique | Value |
-|----------|-------|
-| Max votes/day | 15 |
-| Min between votes | 120s |
-| Jitter sigma | 120s |
-| Skip chance | 8% |
-| Clump chance | 15% |
-| S-curve distribution | 30% first 30min, 45% in 2h, 20% in 4h, 5% tail |
-| Session naming | `s_{id}` (no username in Camofox) |
-| Per-account proxy | 1:1 Evomi hardsession |
-| Tab cooldown | 2 min open after vote |
+The dashboard provides a visual interface for most API operations.
