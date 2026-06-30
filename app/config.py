@@ -4,7 +4,6 @@ except ImportError:
     from pydantic import BaseSettings
 
 from functools import lru_cache
-from typing import Literal
 import os
 
 
@@ -42,25 +41,6 @@ class Settings(BaseSettings):
     # ===== CAPTCHA =====
     capsolver_api_key: str | None = None
     twocaptcha_api_key: str | None = None
-
-    # ===== MODE =====
-    app_mode: Literal["production", "test"] = "production"
-
-    # ===== TEST MODE =====
-    test_server_url: str = "http://localhost:8080"
-    test_server_port: int = 8080
-    test_db_url: str = "sqlite:///./data/test.db"
-    test_session_dir: str = "data/test_sessions"
-
-    # ===== TUNNEL =====
-    tunnel_domain: str = "vaproh.space"
-    tunnel_subdomain: str = "reorchestra-test"
-    tunnel_name: str = "reorchestra-test"
-    tunnel_port: int = 8080
-
-    @property
-    def is_test_mode(self) -> bool:
-        return self.app_mode == "test"
 
     @property
     def camofox_path(self) -> str:

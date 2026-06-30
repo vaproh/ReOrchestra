@@ -18,8 +18,6 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Optional
 
-from urllib.parse import urlparse, parse_qs
-
 from app.config import get_settings
 from app.services.browser import CamofoxClient, Tab
 
@@ -55,40 +53,11 @@ class BaseAction:
     # ------------------------------------------------------------------
 
     def normalize_url(self, url: str) -> str:
-        settings = get_settings()
-
-        if settings.is_test_mode:
-            parsed = urlparse(url)
-            params = parse_qs(parsed.query)
-            test_path = self._get_test_path()
-            query_parts = []
-            for key, values in params.items():
-                for v in values:
-                    query_parts.append(f"{key}={v}")
-            if query_parts:
-                return f"{settings.test_server_url}{test_path}?{'&'.join(query_parts)}"
-            return f"{settings.test_server_url}{test_path}"
-
         if not self.use_old_reddit:
             return url
         url = url.replace("https://www.reddit.com", "https://old.reddit.com")
         url = url.replace("https://reddit.com", "https://old.reddit.com")
         return url
-
-    def _get_test_path(self) -> str:
-        """Map action_type to test server path."""
-        mapping = {
-            "upvote_post": "/post/test-upvote",
-            "downvote_post": "/post/test-downvote",
-            "upvote_comment": "/comment/test-upvote",
-            "downvote_comment": "/comment/test-downvote",
-            "follow_user": "/user/test-follow",
-            "unfollow_user": "/user/test-unfollow",
-            "join_subreddit": "/r/test-join",
-            "leave_subreddit": "/r/test-leave",
-            "save_post": "/post/test-save",
-        }
-        return mapping.get(self.action_type, "/post/test")
 
     # ------------------------------------------------------------------
     # Snapshot scanning helpers

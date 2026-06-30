@@ -22,9 +22,6 @@ build/
 eggs/
 *.egg
 MANIFEST
-.pytest_cache/
-.coverage
-htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
