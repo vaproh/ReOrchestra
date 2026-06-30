@@ -212,14 +212,15 @@ class QueueProcessor:
         assigned_ids = json.loads(task.workers_assigned or "[]")
         failed_ids = json.loads(task.failed_workers or "[]")
 
-        def run_worker(worker: Worker) -> dict:
+        def run_worker(worker_id: int, account_id: int, username: str) -> dict:
             thread_db = self._session_factory()
+            worker = thread_db.query(Worker).filter(Worker.id == worker_id).first()
             try:
                 result = self._execute_for_worker_in_thread(task, worker, thread_db)
-                return {"worker": worker, "result": result, "error": None}
+                return {"worker_id": worker_id, "result": result, "error": None}
             except Exception as e:
-                logger.exception(f"Worker {worker.id} raised exception")
-                return {"worker": worker, "result": None, "error": str(e)}
+                logger.exception(f"Worker {worker_id} raised exception")
+                return {"worker_id": worker_id, "result": None, "error": str(e)}
             finally:
                 thread_db.close()
 
@@ -233,9 +234,12 @@ class QueueProcessor:
 
             max_workers = min(len(assigned), self.max_concurrent_per_task)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(run_worker, worker): worker for worker in assigned}
+                futures = {executor.submit(run_worker, w.id, w.account_id, w.username): w for w in assigned}
                 for future in as_completed(futures):
                     worker = futures[future]
+                    worker_id = worker.id
+                    data = None
+                    result = None
                     try:
                         data = future.result()
                         if data["error"]:
@@ -243,15 +247,20 @@ class QueueProcessor:
                         else:
                             result = data["result"]
                     except Exception as e:
-                        logger.exception(f"Worker {worker.id} future exception")
+                        logger.exception(f"Worker {worker_id} future exception")
                         result = {"success": False, "outcome": "worker_exception", "error": str(e), "attempts": 0, "duration_ms": 0}
 
-                    success = result["success"]
+                    if result is None:
+                        continue
 
-                    h = dedup_hash(worker.id, task.action_type, task.target_url)
+                    success = result["success"]
+                    if data is not None:
+                        worker_id = data["worker_id"]
+
+                    h = dedup_hash(worker_id, task.action_type, task.target_url)
                     log = TaskActionLog(
                         task_id=task.id,
-                        worker_id=worker.id,
+                        worker_id=worker_id,
                         action_type=task.action_type,
                         target_url=task.target_url,
                         success=success,
@@ -265,14 +274,14 @@ class QueueProcessor:
 
                     outcome = result["outcome"]
                     if outcome in ("popup_suspended", "header_suspended"):
-                        self.pool.mark_worker_suspended(worker.id)
+                        self.pool.mark_worker_suspended(worker_id)
                     elif outcome == "header_banned":
-                        self.pool.mark_worker_dead(worker.id)
+                        self.pool.mark_worker_dead(worker_id)
 
-                    self.pool.release_worker(worker.id, success)
+                    self.pool.release_worker(worker_id, success)
                     failed_ids = json.loads(task.failed_workers or "[]")
                     if not success:
-                        failed_ids.append(worker.id)
+                        failed_ids.append(worker_id)
                         task.failed_workers = json.dumps(failed_ids)
                     task.workers_completed += 1
                     self.db.commit()

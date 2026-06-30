@@ -18,16 +18,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.config import get_settings
 from app.models import Base, Account, Worker, AccountStatus, WorkerStatus
 from app.services.queue_processor import QueueProcessor
+from app.logging_config import setup_logging
 
 settings = get_settings()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+setup_logging()
 logger = logging.getLogger("tests")
+
+test_log_dir = Path(__file__).parent.parent / "data" / "test_logs"
+test_log_dir.mkdir(parents=True, exist_ok=True)
+test_log_file = test_log_dir / f"test_{int(time.time())}.log"
+logger.info(f"Test logs will also be saved to {test_log_file}")
 
 
 def load_proxies():
