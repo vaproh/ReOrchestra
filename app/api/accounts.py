@@ -5,7 +5,8 @@ import random
 import os
 import hashlib
 
-from app.database import get_db, Account, AccountStatus, AccountType, ActionLog
+from app.database import get_db, Account, AccountStatus, AccountType
+from app.models import TaskActionLog, Worker
 from app.schemas.account import (
     AccountResponse,
     AccountDetailResponse,
@@ -120,7 +121,7 @@ async def get_account(
         raise HTTPException(status_code=404, detail="Account not found")
 
     is_valid, age_hours = session_valid(account.username)
-    recent = db.query(ActionLog).filter(ActionLog.account_id == account_id).order_by(ActionLog.created_at.desc()).limit(10).all()
+    recent = db.query(TaskActionLog).join(Worker).filter(Worker.account_id == account_id).order_by(TaskActionLog.created_at.desc()).limit(10).all()
 
     return SuccessResponse(data={
         **AccountDetailResponse(
@@ -143,7 +144,7 @@ async def get_account(
             last_login=account.last_login,
             fail_count=account.fail_count,
             created_at=account.created_at,
-            recent_actions=[{"action": a.action_type, "target_url": a.target_id, "success": a.success, "created_at": a.executed_at.isoformat()} for a in recent],
+            recent_actions=[{"action": a.action_type, "target_url": a.target_url, "success": a.success, "created_at": a.created_at.isoformat()} for a in recent],
         ).model_dump(),
     })
 

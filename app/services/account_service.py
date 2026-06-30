@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.models import Account, AccountStatus, ActionLog
+from app.models import Account, AccountStatus
 from app.services.proxy_service import ProxyService
 from app.services.sticky_proxy import StickyProxyClient
 from app.services.rate_limiter import RateLimiter

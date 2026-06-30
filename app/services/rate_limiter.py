@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models import Account, ActionLog
+from app.models import Account, TaskActionLog, Worker
 from app.services.config_service import get_config
 
 
@@ -48,18 +48,18 @@ class RateLimiter:
         max_vote_ratio = self.config.get("rate_limits", "max_vote_only_ratio", default=0.3)
 
         week_ago = datetime.utcnow() - timedelta(days=7)
-        total_actions = db.query(ActionLog).filter(
-            ActionLog.account_id == account.id,
-            ActionLog.created_at >= week_ago,
+        total_actions = db.query(TaskActionLog).join(Worker).filter(
+            Worker.account_id == account.id,
+            TaskActionLog.created_at >= week_ago,
         ).count()
 
         if total_actions == 0:
             return False
 
-        vote_actions = db.query(ActionLog).filter(
-            ActionLog.account_id == account.id,
-            ActionLog.action_type.in_(["upvote", "downvote"]),
-            ActionLog.created_at >= week_ago,
+        vote_actions = db.query(TaskActionLog).join(Worker).filter(
+            Worker.account_id == account.id,
+            TaskActionLog.action_type.in_(["upvote_post", "downvote_post", "upvote_comment", "downvote_comment"]),
+            TaskActionLog.created_at >= week_ago,
         ).count()
 
         vote_ratio = vote_actions / total_actions if total_actions > 0 else 0

@@ -170,7 +170,11 @@ class LoginService:
             with open(session_path, "r") as f:
                 data = json.load(f)
             return data.get("logged_in", False)
-        except Exception:
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("login | session_file_corrupt | username=%s error=%s", username, e)
+            return False
+        except Exception as e:
+            logger.error("login | session_validation_error | username=%s error=%s", username, e)
             return False
 
     async def login_with_session(self, username: str) -> bool:

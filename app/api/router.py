@@ -1,11 +1,10 @@
 from fastapi import APIRouter
-from app.api import accounts, actions, admin, proxies
+from app.api import accounts, admin, proxies
 from app.api import queue_workers, queue_tasks, queue_queue
 
 router = APIRouter()
 
 router.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
-router.include_router(actions.router, prefix="/actions", tags=["actions"])
 router.include_router(admin.router, prefix="/admin", tags=["admin"])
 router.include_router(proxies.router, prefix="/proxies", tags=["proxies"])
 

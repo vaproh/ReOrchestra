@@ -11,15 +11,6 @@ from app.schemas.account import (
     LoginRequest,
     BatchLoginRequest,
 )
-from app.schemas.action import (
-    ActionRequest,
-    DownvoteRequest,
-    CommentRequest,
-    FollowRequest,
-    JoinSubredditRequest,
-    ActionResult,
-    BatchActionResponse,
-)
 from app.schemas.common import (
     PaginationMeta,
     SuccessResponse,

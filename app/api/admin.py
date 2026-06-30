@@ -3,12 +3,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import requests as http_requests
+import logging
 
-from app.database import get_db, Account, Post, ActionLog, Proxy
+from app.database import get_db, Account, Post, Proxy
+from app.models import TaskActionLog, Worker
 from app.models import AccountStatus, AccountType, PostStatus
 from app.schemas.common import SuccessResponse, StatsResponse
 from app.config import get_settings
 
+logger = logging.getLogger("admin")
 router = APIRouter()
 settings = get_settings()
 
@@ -22,10 +25,14 @@ async def health_check():
             camofox_status["connected"] = True
             try:
                 camofox_status.update(r.json())
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except (ValueError, KeyError) as e:
+                logger.warning(f"health | bad_json_response | error={e}")
+    except http_requests.exceptions.ConnectionError:
+        logger.warning("health | camofox_unreachable | port=%s", settings.camofox_port)
+    except http_requests.exceptions.Timeout:
+        logger.warning("health | camofox_timeout | port=%s", settings.camofox_port)
+    except Exception as e:
+        logger.error("health | camofox_check_failed | error=%s", e)
 
     return SuccessResponse(data={
         "status": "ok",
@@ -66,14 +73,20 @@ async def get_stats(db: Session = Depends(get_db)):
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
 
-    actions_today = db.query(func.count(ActionLog.id)).filter(ActionLog.created_at >= today).scalar() or 0
-    actions_week = db.query(func.count(ActionLog.id)).filter(ActionLog.created_at >= week_ago).scalar() or 0
-    actions_month = db.query(func.count(ActionLog.id)).filter(ActionLog.created_at >= month_ago).scalar() or 0
+    actions_today = db.query(func.count(TaskActionLog.id)).filter(TaskActionLog.created_at >= today).scalar() or 0
+    actions_week = db.query(func.count(TaskActionLog.id)).filter(TaskActionLog.created_at >= week_ago).scalar() or 0
+    actions_month = db.query(func.count(TaskActionLog.id)).filter(TaskActionLog.created_at >= month_ago).scalar() or 0
 
     actions_by_type = {
-        "upvote": db.query(func.count(ActionLog.id)).filter(ActionLog.action_type == "upvote", ActionLog.created_at >= month_ago).scalar() or 0,
-        "downvote": db.query(func.count(ActionLog.id)).filter(ActionLog.action_type == "downvote", ActionLog.created_at >= month_ago).scalar() or 0,
-        "login": db.query(func.count(ActionLog.id)).filter(ActionLog.action_type == "login", ActionLog.created_at >= month_ago).scalar() or 0,
+        "upvote": db.query(func.count(TaskActionLog.id)).filter(
+            TaskActionLog.action_type.in_(["upvote_post", "upvote_comment"]),
+            TaskActionLog.created_at >= month_ago,
+        ).scalar() or 0,
+        "downvote": db.query(func.count(TaskActionLog.id)).filter(
+            TaskActionLog.action_type.in_(["downvote_post", "downvote_comment"]),
+            TaskActionLog.created_at >= month_ago,
+        ).scalar() or 0,
+        "login": 0,
     }
 
     total_posts = db.query(func.count(Post.id)).scalar() or 0

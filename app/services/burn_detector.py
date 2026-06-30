@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models import Account, ActionLog, Proxy
+from app.models import Account, TaskActionLog, Worker, Proxy
 from app.models import AccountStatus
 from app.services.config_service import get_config
 
@@ -85,18 +85,18 @@ class BurnDetector:
     ) -> float:
         cutoff = datetime.utcnow() - timedelta(days=window_days)
 
-        total = db.query(ActionLog).filter(
-            ActionLog.account_id == account.id,
-            ActionLog.created_at >= cutoff,
+        total = db.query(TaskActionLog).join(Worker).filter(
+            Worker.account_id == account.id,
+            TaskActionLog.created_at >= cutoff,
         ).count()
 
         if total == 0:
             return 1.0
 
-        successful = db.query(ActionLog).filter(
-            ActionLog.account_id == account.id,
-            ActionLog.created_at >= cutoff,
-            ActionLog.success == True,
+        successful = db.query(TaskActionLog).join(Worker).filter(
+            Worker.account_id == account.id,
+            TaskActionLog.created_at >= cutoff,
+            TaskActionLog.success == True,
         ).count()
 
         return successful / total if total > 0 else 0.0

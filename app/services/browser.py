@@ -133,8 +133,8 @@ class CamofoxClient:
                 params={"userId": tab.user_id},
                 timeout=10,
             )
-        except Exception:
-            pass
+        except requests.exceptions.RequestException as e:
+            logger.warning("browser | close_tab_failed | tab_id=%s error=%s", tab.tab_id, e)
 
     def health(self) -> dict:
         logger.debug("browser | health_check")
