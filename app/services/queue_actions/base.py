@@ -175,7 +175,7 @@ class BaseAction:
                 )
 
             self.camofox.click(tab, ref)
-            self.camofox.wait(tab, timeout=3000)
+            self.camofox.wait(tab, timeout=get_settings().post_click_wait_ms)
 
             after_snapshot, _ = self.camofox.snapshot_quick(tab)
             verify_ok, verify_error = self.verify_success(after_snapshot)

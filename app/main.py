@@ -9,9 +9,8 @@ from app.config import get_settings
 from app.database import init_db
 from app.api.router import router
 
-settings = get_settings()
 logging.basicConfig(
-    level=getattr(logging, settings.log_level),
+    level=getattr(logging, get_settings().log_level),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("api")

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models import CamofoxSlot
 from app.services.config_service import get_config
+from app.config import get_settings
 
 logger = logging.getLogger("slot_manager")
 
@@ -23,6 +24,7 @@ class SlotManager:
 
     def _initialize(self) -> None:
         self.config = get_config()
+        self._settings = get_settings()
         self._semaphores: dict[int, asyncio.Semaphore] = {}
         self._slots: dict[int, CamofoxSlot] = {}
         self._lock = asyncio.Lock()
@@ -48,7 +50,7 @@ class SlotManager:
     async def health_check(self, port: int) -> dict:
         url = f"http://localhost:{port}/"
         try:
-            resp = requests.get(url, timeout=5)
+            resp = requests.get(url, timeout=self._settings.timeout_slot_health)
             data = resp.json()
             return {
                 "connected": True,

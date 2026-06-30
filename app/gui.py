@@ -4,7 +4,6 @@ from fastapi.responses import HTMLResponse
 from app.config import get_settings
 
 router = APIRouter()
-settings = get_settings()
 
 
 GUI_HTML = """<!DOCTYPE html>

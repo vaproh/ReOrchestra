@@ -42,6 +42,22 @@ class Settings(BaseSettings):
     capsolver_api_key: str | None = None
     twocaptcha_api_key: str | None = None
 
+    # ===== TIMEOUTS (seconds) =====
+    timeout_camofox_tab_create: int = 15
+    timeout_camofox_navigate: int = 30
+    timeout_camofox_click: int = 60
+    timeout_camofox_snapshot: int = 30
+    timeout_camofox_type: int = 30
+    timeout_camofox_scroll: int = 30
+    timeout_camofox_close: int = 10
+    timeout_camofox_health: int = 5
+    timeout_camofox_proxy: int = 10
+    timeout_sticky_proxy: int = 10
+    timeout_slot_health: int = 5
+    timeout_admin_health: int = 3
+    action_timeout_seconds: int = 120
+    post_click_wait_ms: int = 3000
+
     @property
     def camofox_path(self) -> str:
         if os.path.isabs(self.camofox_dir):

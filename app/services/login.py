@@ -12,7 +12,6 @@ from app.config import get_settings
 from app.services.browser import CamofoxClient
 from app.models import get_db, Account
 
-settings = get_settings()
 logger = logging.getLogger("login")
 
 
@@ -108,7 +107,7 @@ def _save_session(username: str, session_dir: str, data: dict):
 
 class LoginService:
     def __init__(self):
-        self.session_dir = settings.session_dir
+        self.session_dir = get_settings().session_dir
         self._executor = ThreadPoolExecutor(max_workers=4)
 
     async def login(
@@ -163,7 +162,7 @@ class LoginService:
             # Check file age
             from datetime import datetime
             file_age_hours = (datetime.utcnow() - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
-            if file_age_hours > settings.max_session_age_hours:
+            if file_age_hours > get_settings().max_session_age_hours:
                 logger.info(f"login | session_expired | username={username} age_hours={file_age_hours:.1f}")
                 return False
             

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from app.config import get_settings
 
-settings = get_settings()
 logger = logging.getLogger("browser")
 
 
@@ -22,11 +21,13 @@ class CamofoxClient:
     BASE_URL: str
 
     def __init__(self, base_url: str | None = None, user_id: str = "u1", session_key: str = "s1"):
+        settings = get_settings()
         if base_url is None:
             base_url = f"http://localhost:{settings.camofox_port}"
         self.BASE_URL = base_url
         self.user_id = user_id
         self.session_key = session_key
+        self._settings = settings
 
     def _url(self, path: str) -> str:
         return f"{self.BASE_URL}{path}"
@@ -37,7 +38,7 @@ class CamofoxClient:
             "userId": self.user_id,
             "sessionKey": self.session_key,
             "url": url,
-        }, timeout=15)
+        }, timeout=self._settings.timeout_camofox_tab_create)
         resp.raise_for_status()
         data = resp.json()
         logger.debug(f"browser | create_tab | tab_id={data['tabId']}")
@@ -52,7 +53,7 @@ class CamofoxClient:
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/navigate"),
             json={"userId": tab.user_id, "url": url},
-            timeout=30,
+            timeout=self._settings.timeout_camofox_navigate,
         )
         resp.raise_for_status()
         time.sleep(wait)
@@ -81,7 +82,7 @@ class CamofoxClient:
         resp = requests.get(
             self._url(f"/tabs/{tab.tab_id}/snapshot"),
             params={"userId": tab.user_id},
-            timeout=30,
+            timeout=self._settings.timeout_camofox_snapshot,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -100,7 +101,7 @@ class CamofoxClient:
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/type"),
             json={"userId": tab.user_id, "ref": ref, "text": text},
-            timeout=30,
+            timeout=self._settings.timeout_camofox_type,
         )
         resp.raise_for_status()
         time.sleep(delay)
@@ -110,7 +111,7 @@ class CamofoxClient:
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/click"),
             json={"userId": tab.user_id, "ref": ref},
-            timeout=60,
+            timeout=self._settings.timeout_camofox_click,
         )
         resp.raise_for_status()
         time.sleep(delay)
@@ -120,7 +121,7 @@ class CamofoxClient:
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/scroll"),
             json={"userId": tab.user_id, "direction": direction, "amount": amount},
-            timeout=30,
+            timeout=self._settings.timeout_camofox_scroll,
         )
         resp.raise_for_status()
         time.sleep(delay)
@@ -131,14 +132,14 @@ class CamofoxClient:
             requests.delete(
                 self._url(f"/tabs/{tab.tab_id}"),
                 params={"userId": tab.user_id},
-                timeout=10,
+                timeout=self._settings.timeout_camofox_close,
             )
         except requests.exceptions.RequestException as e:
             logger.warning("browser | close_tab_failed | tab_id=%s error=%s", tab.tab_id, e)
 
     def health(self) -> dict:
         logger.debug("browser | health_check")
-        resp = requests.get(self._url("/"), timeout=5)
+        resp = requests.get(self._url("/"), timeout=self._settings.timeout_camofox_health)
         return resp.json()
 
     def set_user_proxy(self, user_id: str, proxy: str) -> dict:
@@ -147,7 +148,7 @@ class CamofoxClient:
         resp = requests.post(
             self._url(f"/users/{user_id}/proxy"),
             json={"proxy_string": proxy},
-            timeout=10,
+            timeout=self._settings.timeout_camofox_proxy,
         )
         resp.raise_for_status()
         return resp.json()
@@ -175,6 +176,7 @@ _profiles_cache: Optional[dict] = None
 def load_profiles() -> Optional[dict]:
     global _profiles_cache
     if _profiles_cache is None:
+        settings = get_settings()
         with open(settings.profiles_path) as f:
             _profiles_cache = json.load(f)
     return _profiles_cache

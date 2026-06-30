@@ -42,7 +42,7 @@ class QueueProcessor:
         self.max_retries = 3
         settings = get_settings()
         self.max_concurrent_per_task = getattr(settings, 'max_concurrent_per_task', 3)
-        self.action_timeout = 120
+        self.action_timeout = settings.action_timeout_seconds
         self._stop_event = threading.Event()
         self._cancel_events: dict[int, threading.Event] = {}
         self._thread: Optional[threading.Thread] = None

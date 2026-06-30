@@ -13,14 +13,14 @@ from app.config import get_settings
 
 logger = logging.getLogger("admin")
 router = APIRouter()
-settings = get_settings()
 
 
 @router.get("/health", response_model=SuccessResponse)
 async def health_check():
+    settings = get_settings()
     camofox_status = {"connected": False, "port": settings.camofox_port}
     try:
-        r = http_requests.get(f"http://localhost:{settings.camofox_port}/", timeout=3)
+        r = http_requests.get(f"http://localhost:{settings.camofox_port}/", timeout=settings.timeout_admin_health)
         if r.ok:
             camofox_status["connected"] = True
             try:

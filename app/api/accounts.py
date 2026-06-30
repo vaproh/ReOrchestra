@@ -22,10 +22,10 @@ from app.config import get_settings
 from app.services.browser import list_profile_ids
 
 router = APIRouter()
-settings = get_settings()
 
 
 def session_valid(username: str) -> tuple[bool, float | None]:
+    settings = get_settings()
     session_path = os.path.join(settings.session_dir, f"{username}.cookies")
     if not os.path.exists(session_path):
         return False, None
@@ -137,7 +137,7 @@ async def get_account(
             email_verified=account.email_verified,
             proxy=account.proxy,
             profile_id=account.profile_id,
-            cookies_present=os.path.exists(os.path.join(settings.session_dir, f"{account.username}.cookies")),
+            cookies_present=os.path.exists(os.path.join(get_settings().session_dir, f"{account.username}.cookies")),
             session_valid=is_valid,
             session_age_hours=age_hours,
             last_used=account.last_used,
@@ -183,7 +183,7 @@ async def delete_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    session_path = os.path.join(settings.session_dir, f"{account.username}.cookies")
+    session_path = os.path.join(get_settings().session_dir, f"{account.username}.cookies")
     if os.path.exists(session_path):
         os.remove(session_path)
 
@@ -210,7 +210,7 @@ async def batch_delete_accounts(
 
     accounts = query.all()
     for account in accounts:
-        session_path = os.path.join(settings.session_dir, f"{account.username}.cookies")
+        session_path = os.path.join(get_settings().session_dir, f"{account.username}.cookies")
         if os.path.exists(session_path):
             os.remove(session_path)
         db.delete(account)
@@ -348,6 +348,7 @@ async def check_session(
         raise HTTPException(status_code=404, detail="Account not found")
 
     is_valid, age_hours = session_valid(account.username)
+    settings = get_settings()
     expires_in = max(0, settings.max_session_age_hours - age_hours) if age_hours else settings.max_session_age_hours
 
     return SuccessResponse(data={

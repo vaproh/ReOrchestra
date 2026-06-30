@@ -1,11 +1,13 @@
 import re
 import requests
 from typing import Optional
+from app.config import get_settings
 
 
 class StickyProxyClient:
     def __init__(self, camofox_base_url: str = "http://localhost:9377"):
         self.base_url = camofox_base_url.rstrip("/")
+        self._settings = get_settings()
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}{path}"
@@ -27,7 +29,7 @@ class StickyProxyClient:
         resp = requests.post(
             self._url(f"/users/{user_id}/proxy"),
             json={"proxy_string": proxy_string},
-            timeout=10,
+            timeout=self._settings.timeout_sticky_proxy,
         )
         resp.raise_for_status()
         return resp.json()
@@ -35,7 +37,7 @@ class StickyProxyClient:
     def get_proxy(self, user_id: str) -> Optional[dict]:
         resp = requests.get(
             self._url(f"/users/{user_id}/proxy"),
-            timeout=10,
+            timeout=self._settings.timeout_sticky_proxy,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -44,13 +46,13 @@ class StickyProxyClient:
     def delete_proxy(self, user_id: str) -> dict:
         resp = requests.delete(
             self._url(f"/users/{user_id}/proxy"),
-            timeout=10,
+            timeout=self._settings.timeout_sticky_proxy,
         )
         resp.raise_for_status()
         return resp.json()
 
     def list_users(self) -> dict:
-        resp = requests.get(self._url("/users"), timeout=10)
+        resp = requests.get(self._url("/users"), timeout=self._settings.timeout_sticky_proxy)
         resp.raise_for_status()
         return resp.json()
 
@@ -83,6 +85,6 @@ class StickyProxyClient:
         return None
 
     def health_check(self) -> dict:
-        resp = requests.get(self._url("/health"), timeout=5)
+        resp = requests.get(self._url("/health"), timeout=self._settings.timeout_slot_health)
         resp.raise_for_status()
         return resp.json()

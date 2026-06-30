@@ -301,10 +301,10 @@ class TaskActionLog(Base):
     worker = relationship("Worker")
 
 
-settings = get_settings()
+_settings = get_settings()
 engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {}
+    _settings.database_url,
+    connect_args={"check_same_thread": False} if "sqlite" in _settings.database_url else {}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
