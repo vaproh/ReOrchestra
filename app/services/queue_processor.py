@@ -18,11 +18,11 @@ from datetime import datetime
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.models import (
     Task, TaskStatus, Worker, WorkerStatus,
-    TaskActionLog, ActionOutcome, SessionLocal,
+    TaskActionLog, ActionOutcome,
 )
 from app.services.browser import CamofoxClient
 from app.services.worker_pool import WorkerPool
@@ -43,6 +43,7 @@ class QueueProcessor:
         self.action_timeout = 120
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self._session_factory = sessionmaker(bind=db.bind)
 
     # ------------------------------------------------------------------
     # Queue inspection
@@ -212,7 +213,7 @@ class QueueProcessor:
         failed_ids = json.loads(task.failed_workers or "[]")
 
         def run_worker(worker: Worker) -> dict:
-            thread_db = SessionLocal()
+            thread_db = self._session_factory()
             try:
                 result = self._execute_for_worker_in_thread(task, worker, thread_db)
                 return {"worker": worker, "result": result, "error": None}
