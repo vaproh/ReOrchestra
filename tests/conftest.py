@@ -181,15 +181,33 @@ def db_engine():
     engine.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def db_session(db_engine):
-    """Create session-scoped DB session."""
+    """Create function-scoped DB session."""
     Session = sessionmaker(bind=db_engine)
     session = Session()
     logger.debug("DB session created")
     yield session
+    session.rollback()
     session.close()
     logger.debug("DB session closed")
+
+
+@pytest.fixture(scope="function", autouse=True)
+def cleanup_queue(db_session):
+    """Clean up pending tasks before each test."""
+    import time
+    from app.models import Task, Worker, TaskStatus, WorkerStatus
+    
+    db_session.query(Task).filter(Task.status == TaskStatus.running).update({"status": TaskStatus.cancelled})
+    db_session.query(Task).filter(Task.status == TaskStatus.queued).delete()
+    db_session.query(Worker).filter(Worker.status == WorkerStatus.working).update({"status": WorkerStatus.idle})
+    db_session.commit()
+    db_session.expire_all()
+    time.sleep(0.5)
+    yield
+    db_session.rollback()
+    db_session.expire_all()
 
 
 @pytest.fixture(scope="function")
@@ -234,14 +252,15 @@ def test_worker(db_session, test_account):
     yield worker
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def queue_processor(db_session):
-    """Create QueueProcessor instance."""
+    """Create QueueProcessor instance per test."""
     processor = QueueProcessor(db_session)
     logger.info("QueueProcessor created")
     yield processor
     if processor.is_running():
         processor.stop()
+    time.sleep(1)
     logger.info("QueueProcessor stopped")
 
 

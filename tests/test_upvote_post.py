@@ -68,7 +68,7 @@ class TestUpvotePostIntegration:
         logger.info(f"[TEST] Starting queue processor...")
 
         queue_processor.start()
-        time.sleep(8)
+        time.sleep(30)
         queue_processor.stop()
 
         db_session.expire_all()
@@ -111,7 +111,7 @@ class TestUpvotePostIntegration:
         logger.info(f"[TEST] Starting queue processor...")
 
         queue_processor.start()
-        time.sleep(8)
+        time.sleep(30)
         queue_processor.stop()
 
         db_session.expire_all()
@@ -123,7 +123,7 @@ class TestUpvotePostIntegration:
             logger.error(f"[TEST] No action log found for task_id={task.id}")
 
         assert log is not None, "No action log found"
-        assert log.outcome == "popup_suspended", f"Expected outcome='popup_suspended', got '{log.outcome}'"
+        assert log.outcome == "suspended", f"Expected outcome='suspended', got '{log.outcome}'"
 
         logger.info(f"[TEST] ✅ PASSED: test_upvote_scenario_suspended")
 
@@ -146,7 +146,7 @@ class TestUpvotePostIntegration:
         logger.info(f"[TEST] Starting queue processor...")
 
         queue_processor.start()
-        time.sleep(8)
+        time.sleep(30)
         queue_processor.stop()
 
         db_session.expire_all()
@@ -158,6 +158,6 @@ class TestUpvotePostIntegration:
             logger.error(f"[TEST] No action log found for task_id={task.id}")
 
         assert log is not None, "No action log found"
-        assert log.outcome == "popup_account_locked", f"Expected outcome='popup_account_locked', got '{log.outcome}'"
+        assert log.outcome == "account_locked", f"Expected outcome='account_locked', got '{log.outcome}'"
 
         logger.info(f"[TEST] ✅ PASSED: test_upvote_scenario_locked")

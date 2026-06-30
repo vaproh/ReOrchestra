@@ -203,6 +203,8 @@ class QueueProcessor:
 
     def process_task(self, task: Task):
         """Process a single task to completion."""
+        task_id = task.id
+        task = self.db.query(Task).filter(Task.id == task_id).first()
         task.status = TaskStatus.running
         task.started_at = datetime.utcnow()
         self.db.commit()
@@ -212,11 +214,16 @@ class QueueProcessor:
         assigned_ids = json.loads(task.workers_assigned or "[]")
         failed_ids = json.loads(task.failed_workers or "[]")
 
+        task_id = task.id
+        action_type = task.action_type
+        target_url = task.target_url
+
         def run_worker(worker_id: int, account_id: int, username: str) -> dict:
             thread_db = self._session_factory()
             worker = thread_db.query(Worker).filter(Worker.id == worker_id).first()
+            task_for_worker = thread_db.query(Task).filter(Task.id == task_id).first()
             try:
-                result = self._execute_for_worker_in_thread(task, worker, thread_db)
+                result = self._execute_for_worker_in_thread(task_for_worker, worker, thread_db)
                 return {"worker_id": worker_id, "result": result, "error": None}
             except Exception as e:
                 logger.exception(f"Worker {worker_id} raised exception")
@@ -234,10 +241,9 @@ class QueueProcessor:
 
             max_workers = min(len(assigned), self.max_concurrent_per_task)
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(run_worker, w.id, w.account_id, w.username): w for w in assigned}
+                futures = {executor.submit(run_worker, w.id, w.account_id, w.username): w.id for w in assigned}
                 for future in as_completed(futures):
-                    worker = futures[future]
-                    worker_id = worker.id
+                    worker_id = futures[future]
                     data = None
                     result = None
                     try:
@@ -319,7 +325,12 @@ class QueueProcessor:
 
     def stop(self):
         self._running = False
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=10)
         logger.info("queue | processor_stop")
+
+    def is_stopped(self) -> bool:
+        return not self._thread or not self._thread.is_alive()
 
     def is_running(self) -> bool:
         return self._running
@@ -333,6 +344,7 @@ class QueueProcessor:
                     time.sleep(2)
                     continue
                 self.process_task(task)
+                self.db.expire_all()
             except Exception as e:
                 logger.error(f"Queue loop error: {e}", exc_info=True)
                 time.sleep(5)
