@@ -22,11 +22,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.models import (
     Task, TaskStatus, Worker, WorkerStatus,
-    TaskActionLog, ActionOutcome,
+    TaskActionLog, ActionOutcome, Account,
 )
 from app.services.browser import CamofoxClient
 from app.services.worker_pool import WorkerPool
 from app.services.queue_actions import get_action_class, dedup_hash
+from app.services.rate_limiter import RateLimiter
 from app.config import get_settings
 
 logger = logging.getLogger("queue")
@@ -37,11 +38,13 @@ class QueueProcessor:
         self.db = db
         self.camofox = camofox or CamofoxClient()
         self.pool = WorkerPool(db)
+        self.rate_limiter = RateLimiter()
         self.max_retries = 3
         settings = get_settings()
         self.max_concurrent_per_task = getattr(settings, 'max_concurrent_per_task', 3)
         self.action_timeout = 120
-        self._running = False
+        self._stop_event = threading.Event()
+        self._cancel_events: dict[int, threading.Event] = {}
         self._thread: Optional[threading.Thread] = None
         self._session_factory = sessionmaker(bind=db.bind)
 
@@ -89,6 +92,10 @@ class QueueProcessor:
             raise ValueError("Task not found")
         task.status = TaskStatus.cancelled
         task.completed_at = datetime.utcnow()
+        # Signal cancellation to running workers
+        cancel_event = self._cancel_events.get(task_id)
+        if cancel_event:
+            cancel_event.set()
         # release assigned workers
         for wid in json.loads(task.workers_assigned or "[]"):
             self.pool.release_worker(wid, success=False)
@@ -156,7 +163,7 @@ class QueueProcessor:
             "duration_ms": final_result.duration_ms if final_result else 0,
         }
 
-    def _execute_for_worker_in_thread(self, task: Task, worker: Worker, db: Session) -> dict:
+    def _execute_for_worker_in_thread(self, task: Task, worker: Worker, db: Session, cancel_event: Optional[threading.Event] = None) -> dict:
         """
         Thread-safe version of execute_for_worker that uses a separate DB session.
         """
@@ -170,6 +177,17 @@ class QueueProcessor:
         final_result = None
 
         for attempt in range(1, self.max_retries + 1):
+            # Check if task was cancelled
+            if cancel_event and cancel_event.is_set():
+                logger.info(f"queue | worker_cancelled | task_id={task.id} worker_id={worker.id}")
+                return {
+                    "success": False,
+                    "outcome": "cancelled",
+                    "error": "Task was cancelled",
+                    "attempts": total_attempts,
+                    "duration_ms": 0,
+                }
+            
             logger.info(
                 f"queue | task_attempt | task_id={task.id} worker_id={worker.id} attempt={attempt}/{self.max_retries}"
             )
@@ -191,7 +209,10 @@ class QueueProcessor:
             if attempt < self.max_retries:
                 backoff = min(2 ** attempt, 30)
                 logger.info(f"queue | retry_backoff | task_id={task.id} worker_id={worker.id} backoff={backoff}s")
-                time.sleep(backoff)
+                # Use interruptible sleep
+                if cancel_event and cancel_event.wait(timeout=backoff):
+                    logger.info(f"queue | worker_cancelled_during_backoff | task_id={task.id} worker_id={worker.id}")
+                    break
 
         return {
             "success": final_result.success if final_result else False,
@@ -211,6 +232,10 @@ class QueueProcessor:
 
         logger.info(f"queue | task_start | task_id={task.id} action_type={task.action_type}")
 
+        # Create cancel event for this task
+        cancel_event = threading.Event()
+        self._cancel_events[task_id] = cancel_event
+
         assigned_ids = json.loads(task.workers_assigned or "[]")
         failed_ids = json.loads(task.failed_workers or "[]")
 
@@ -222,8 +247,31 @@ class QueueProcessor:
             thread_db = self._session_factory()
             worker = thread_db.query(Worker).filter(Worker.id == worker_id).first()
             task_for_worker = thread_db.query(Task).filter(Task.id == task_id).first()
+            account = thread_db.query(Account).filter(Account.id == account_id).first()
             try:
-                result = self._execute_for_worker_in_thread(task_for_worker, worker, thread_db)
+                # Check rate limits before executing
+                if account and action_type in ("upvote_post", "downvote_post", "upvote_comment", "downvote_comment"):
+                    allowed, reason = self.rate_limiter.check(account, thread_db)
+                    if not allowed:
+                        logger.info(f"queue | rate_limited | worker_id={worker_id} reason={reason}")
+                        return {
+                            "worker_id": worker_id,
+                            "result": {
+                                "success": False,
+                                "outcome": f"rate_limited_{reason}",
+                                "error": reason,
+                                "attempts": 0,
+                                "duration_ms": 0,
+                            },
+                            "error": None,
+                        }
+                
+                result = self._execute_for_worker_in_thread(task_for_worker, worker, thread_db, cancel_event=cancel_event)
+                
+                # Record vote if successful
+                if result["success"] and account and action_type in ("upvote_post", "downvote_post", "upvote_comment", "downvote_comment"):
+                    self.rate_limiter.record_vote(account, thread_db)
+                
                 return {"worker_id": worker_id, "result": result, "error": None}
             except Exception as e:
                 logger.exception(f"Worker {worker_id} raised exception")
@@ -232,6 +280,11 @@ class QueueProcessor:
                 thread_db.close()
 
         while len(assigned_ids) < task.workers_needed:
+            # Check if task was cancelled
+            if cancel_event.is_set():
+                logger.info(f"queue | task_cancelled | task_id={task.id}")
+                break
+            
             batch_size = min(self.max_concurrent_per_task, task.workers_needed - len(assigned_ids))
             assigned = self.pool.assign_workers(task, batch_size)
             if not assigned:
@@ -305,46 +358,77 @@ class QueueProcessor:
             task.status = TaskStatus.failed
         else:
             task.status = TaskStatus.partial
+        
+        # Check if failed/partial task should go to dead letter queue
+        if task.status in (TaskStatus.failed, TaskStatus.partial):
+            if task.retry_count < task.max_retries:
+                # Re-queue for retry
+                task.retry_count += 1
+                task.status = TaskStatus.queued
+                task.started_at = None
+                task.completed_at = None
+                task.workers_assigned = "[]"
+                task.failed_workers = "[]"
+                task.workers_completed = 0
+                logger.info(f"queue | task_requeued | task_id={task.id} retry_count={task.retry_count}/{task.max_retries}")
+            else:
+                # Move to dead letter queue
+                task.status = TaskStatus.dead_letter
+                task.dlq_reason = "max_retries_exceeded"
+                task.dlq_at = datetime.utcnow()
+                task.last_error = f"Failed after {task.max_retries} retries. {failed}/{total} workers failed."
+                logger.warning(f"queue | task_dlq | task_id={task.id} reason={task.dlq_reason}")
+        
         task.completed_at = datetime.utcnow()
         self.db.commit()
         logger.info(
             f"queue | task_complete | task_id={task.id} status={task.status.value} succeeded={succeeded} failed={failed}"
         )
+        
+        # Clean up cancel event
+        if task_id in self._cancel_events:
+            del self._cancel_events[task_id]
 
     # ------------------------------------------------------------------
     # Background loop
     # ------------------------------------------------------------------
 
     def start(self):
-        if self._running:
+        if not self._stop_event.is_set():
             return
-        self._running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
         logger.info("queue | processor_start")
 
-    def stop(self):
-        self._running = False
+    def stop(self, timeout: float = 300):
+        self._stop_event.set()
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=10)
+            self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                logger.warning("queue | processor_stop | thread did not exit within timeout")
+        if self.db:
+            self.db.close()
         logger.info("queue | processor_stop")
 
     def is_stopped(self) -> bool:
         return not self._thread or not self._thread.is_alive()
 
     def is_running(self) -> bool:
-        return self._running
+        return self._thread is not None and self._thread.is_alive() and not self._stop_event.is_set()
 
     def _loop(self):
-        while self._running:
+        while not self._stop_event.is_set():
             try:
                 self.db.expire_all()
                 task = self.next_task()
                 if not task:
-                    time.sleep(2)
+                    if self._stop_event.wait(timeout=2):
+                        break
                     continue
                 self.process_task(task)
                 self.db.expire_all()
             except Exception as e:
                 logger.error(f"Queue loop error: {e}", exc_info=True)
-                time.sleep(5)
+                if self._stop_event.wait(timeout=5):
+                    break

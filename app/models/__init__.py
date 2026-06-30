@@ -203,6 +203,7 @@ class TaskStatus(str, enum.Enum):
     partial = "partial"
     failed = "failed"
     cancelled = "cancelled"
+    dead_letter = "dead_letter"
 
 
 class ActionOutcome(str, enum.Enum):
@@ -266,6 +267,13 @@ class Task(Base):
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Dead Letter Queue fields
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    dlq_reason = Column(String(128), nullable=True)
+    dlq_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
 
     logs = relationship("TaskActionLog", back_populates="task", order_by="TaskActionLog.created_at")
 

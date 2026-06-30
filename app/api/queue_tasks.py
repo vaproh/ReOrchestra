@@ -138,3 +138,49 @@ async def priority_boost(task_id: int, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=404, detail="Task not found")
     return SuccessResponse(data={"queue_position": 1, "priority": task.priority})
+
+
+@router.get("/dead-letter", response_model=SuccessResponse)
+async def list_dead_letter_tasks(db: Session = Depends(get_db)):
+    """List all tasks in the dead letter queue."""
+    tasks = db.query(Task).filter(Task.status == TaskStatus.dead_letter).order_by(Task.dlq_at.desc()).limit(100).all()
+    return SuccessResponse(data={
+        "total": len(tasks),
+        "tasks": [
+            {
+                **_task_dict(t),
+                "retry_count": t.retry_count,
+                "max_retries": t.max_retries,
+                "dlq_reason": t.dlq_reason,
+                "dlq_at": t.dlq_at.isoformat() if t.dlq_at else None,
+                "last_error": t.last_error,
+            }
+            for t in tasks
+        ],
+    })
+
+
+@router.post("/{task_id}/retry", response_model=SuccessResponse)
+async def retry_task(task_id: int, db: Session = Depends(get_db)):
+    """Retry a failed or dead-lettered task."""
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    if task.status not in (TaskStatus.failed, TaskStatus.dead_letter, TaskStatus.partial):
+        raise HTTPException(status_code=400, detail=f"Task cannot be retried (status: {task.status.value})")
+    
+    # Reset task for retry
+    task.status = TaskStatus.queued
+    task.started_at = None
+    task.completed_at = None
+    task.workers_assigned = "[]"
+    task.failed_workers = "[]"
+    task.workers_completed = 0
+    task.retry_count += 1
+    task.dlq_reason = None
+    task.dlq_at = None
+    task.last_error = None
+    db.commit()
+    
+    return SuccessResponse(data={"status": task.status.value, "retry_count": task.retry_count})

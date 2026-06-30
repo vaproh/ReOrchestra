@@ -160,6 +160,13 @@ class LoginService:
         if not os.path.exists(session_path):
             return False
         try:
+            # Check file age
+            from datetime import datetime
+            file_age_hours = (datetime.utcnow() - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
+            if file_age_hours > settings.max_session_age_hours:
+                logger.info(f"login | session_expired | username={username} age_hours={file_age_hours:.1f}")
+                return False
+            
             with open(session_path, "r") as f:
                 data = json.load(f)
             return data.get("logged_in", False)

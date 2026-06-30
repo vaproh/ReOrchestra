@@ -22,6 +22,9 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database initialized")
     yield
+    # Graceful shutdown
+    from app.services.queue_manager import QueueManager
+    QueueManager.get().stop()
     logger.info("Shutting down")
 
 

@@ -146,7 +146,7 @@ class CamofoxClient:
         logger.debug(f"browser | set_user_proxy | user_id={user_id} proxy={proxy}")
         resp = requests.post(
             self._url(f"/users/{user_id}/proxy"),
-            json={"proxy": proxy},
+            json={"proxy_string": proxy},
             timeout=10,
         )
         resp.raise_for_status()
