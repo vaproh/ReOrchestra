@@ -126,23 +126,23 @@ All settings are managed via `.env` file and `app/config.py`.
 
 ---
 
-## Phase 6: Cleanup 🧹
+## Phase 6: Cleanup 🧹 ✅
 
-### 6.1 Remove Legacy Action System
+### 6.1 Remove Legacy Action System ✅
 - **Files:** `app/api/actions.py`, `app/services/action_service.py`
 - **Issue:** Duplicate action systems
 - **Breakdown:**
-  - [ ] Audit all usages of `ActionService`
-  - [ ] Remove legacy files
-  - [ ] Update router to remove `/api/actions/*` routes
+  - [x] Audit all usages of `ActionService`
+  - [x] Remove legacy files
+  - [x] Update router to remove `/api/actions/*` routes
 
-### 6.2 Fix Technical Debt
+### 6.2 Fix Technical Debt ✅
 - **Files:** Various
 - **Breakdown:**
-  - [ ] Remove bare `except Exception` - catch specific exceptions
+  - [x] Remove bare `except Exception` - catch specific exceptions
   - [ ] Remove `global settings` at module import - lazy load
   - [ ] Make timeouts configurable in config
-  - [ ] Fix thread-unsafe `QueueManager` with proper locking
+  - [x] Fix thread-unsafe `QueueManager` with proper locking
 
 ### 6.3 Testing
 - **Files:** `tests/` directory
@@ -155,12 +155,12 @@ All settings are managed via `.env` file and `app/config.py`.
 
 ## Priority Order
 
-1. **1.2** (DB Sessions) - Stability
-2. **2.1** (RateLimiter) - Prevent account burning
-3. **3.1** (Dead Letter Queue) - Failed task visibility
-4. **3.2** (Graceful Shutdown) - Production reliability
+1. ~~**1.2** (DB Sessions) - Stability~~ ✅
+2. ~~**2.1** (RateLimiter) - Prevent account burning~~ ✅
+3. ~~**3.1** (Dead Letter Queue) - Failed task visibility~~ ✅
+4. ~~**3.2** (Graceful Shutdown) - Production reliability~~ ✅
 5. **4.1** (Dashboard) - UX for managing 500+ accounts
-6. **6** (Cleanup) - Technical debt
+6. ~~**6** (Cleanup) - Technical debt~~ ✅ (partial - 6.1, 6.2 thread-safety, 6.2 bare excepts done)
 
 ---
 
