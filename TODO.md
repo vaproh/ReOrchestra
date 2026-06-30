@@ -12,34 +12,8 @@ All settings are managed via `.env` file and `app/config.py`.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `APP_MODE` | `production` | `production` or `test` |
 | `CAMOFOX_DIR` | `../camofox` | Path to Camofox directory |
 | `CAMOFOX_PORT` | `9377` | Camofox server port |
-| `TEST_SERVER_URL` | `http://localhost:8080` | Test server URL |
-| `TEST_SERVER_PORT` | `8080` | Test server port |
-| `TEST_DB_URL` | `sqlite:///./data/test.db` | Test database |
-| `TEST_SESSION_DIR` | `data/test_sessions` | Test sessions directory |
-| `TEST_PROXY` | `http://test_proxy:8080` | Test proxy |
-| `TUNNEL_DOMAIN` | `vaproh.space` | Tunnel domain |
-| `TUNNEL_SUBDOMAIN` | `reorchestra-test` | Tunnel subdomain |
-| `TUNNEL_NAME` | `reorchestra-test` | Cloudflare tunnel name |
-
-### Starting Test Mode
-
-```bash
-# 1. Set mode
-export APP_MODE=test
-export TEST_SERVER_URL=https://reorchestra-test.vaproh.space
-
-# 2. Start tunnel (Terminal 1)
-python tests/start_permanent_tunnel.py
-
-# 3. Start test server (Terminal 2)
-uvicorn tests.server:app --port 8080
-
-# 4. Run tests (Terminal 3)
-pytest tests/ -v
-```
 
 ---
 
@@ -152,49 +126,6 @@ pytest tests/ -v
 
 ---
 
-## Phase 5: Test Mode 🧪 ✅
-
-### 5.1 Test Server
-- [x] Create FastAPI server (`tests/server.py`)
-- [x] Create 9 HTML test pages (one per action)
-- [x] Support `?scenario=suspended|locked|rate_limited|banned` query params
-- [x] Track per-session state (upvoted, followed, etc.)
-- [x] Provide `/api/state/{session}` endpoint for assertions
-- [x] Provide `/api/reset/{session}` for resetting state
-
-### 5.2 Test Mode Config
-- [x] Add `APP_MODE` env var (`production` | `test`)
-- [x] Add `TEST_SERVER_URL` env var (default `http://localhost:8080`)
-- [x] Add `is_test_mode` property to Settings
-
-### 5.3 URL Routing for Test Mode
-- [x] Add `_get_test_path()` method mapping action_type to test URL
-- [x] Modify `normalize_url()` to route to test server when `APP_MODE=test`
-
-### 5.4 Login Bypass for Test Mode
-- [x] Add `_fake_login()` method that creates session without Reddit
-- [x] Skip `_do_login_sync()` when `APP_MODE=test`
-
-### 5.5 Test Database & Fixtures
-- [x] Use separate `data/test.db` SQLite file
-- [x] Session-scoped DB (shared between tests)
-- [x] Auto-generate test accounts with real proxy format
-- [x] Auto-generate test workers
-- [x] `test_server` fixture to start/stop FastAPI server
-- [x] Session cleanup (removes test sessions from Camofox data dir)
-
-### 5.6 Pytest Suite
-- [x] Test all 9 actions with success scenario
-- [x] Test all 9 actions with failure scenarios (suspended, locked, etc.)
-- [x] Test deduplication
-- [x] Test parallel worker execution
-
-### 5.7 Tunnel Integration
-- [x] Temporary tunnel: `tests/start_tunnel.py` (trycloudflare.com)
-- [x] Permanent tunnel: `tests/start_permanent_tunnel.py` (reorchestra-test.vaproh.space)
-
----
-
 ## Phase 6: Cleanup 🧹
 
 ### 6.1 Remove Legacy Action System
@@ -224,13 +155,12 @@ pytest tests/ -v
 
 ## Priority Order
 
-1. **5** (Test Mode) - Verify everything works without touching Reddit
-2. **1.2** (DB Sessions) - Stability
-3. **2.1** (RateLimiter) - Prevent account burning
-4. **3.1** (Dead Letter Queue) - Failed task visibility
-5. **3.2** (Graceful Shutdown) - Production reliability
-6. **4.1** (Dashboard) - UX for managing 500+ accounts
-7. **6** (Cleanup) - Technical debt
+1. **1.2** (DB Sessions) - Stability
+2. **2.1** (RateLimiter) - Prevent account burning
+3. **3.1** (Dead Letter Queue) - Failed task visibility
+4. **3.2** (Graceful Shutdown) - Production reliability
+5. **4.1** (Dashboard) - UX for managing 500+ accounts
+6. **6** (Cleanup) - Technical debt
 
 ---
 
