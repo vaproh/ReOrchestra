@@ -140,8 +140,8 @@ All settings are managed via `.env` file and `app/config.py`.
 - **Files:** Various
 - **Breakdown:**
   - [x] Remove bare `except Exception` - catch specific exceptions
-  - [ ] Remove `global settings` at module import - lazy load
-  - [ ] Make timeouts configurable in config
+  - [x] Remove `global settings` at module import - lazy load
+  - [x] Make timeouts configurable in config
   - [x] Fix thread-unsafe `QueueManager` with proper locking
 
 ### 6.3 Testing
@@ -160,7 +160,7 @@ All settings are managed via `.env` file and `app/config.py`.
 3. ~~**3.1** (Dead Letter Queue) - Failed task visibility~~ ✅
 4. ~~**3.2** (Graceful Shutdown) - Production reliability~~ ✅
 5. **4.1** (Dashboard) - UX for managing 500+ accounts
-6. ~~**6** (Cleanup) - Technical debt~~ ✅ (partial - 6.1, 6.2 thread-safety, 6.2 bare excepts done)
+6. ~~**6** (Cleanup) - Technical debt~~ ✅ (6.1, 6.2 complete)
 
 ---
 
