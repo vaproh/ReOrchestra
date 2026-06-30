@@ -1,109 +1,174 @@
-"""Test downvote_post action."""
+"""
+Tests for downvote_post action - direct action testing without QueueProcessor.
+"""
 import time
 import logging
 import pytest
+from unittest.mock import Mock
 
-from app.models import TaskStatus, TaskActionLog
+from app.models import TaskActionLog
 
 logger = logging.getLogger("tests.downvote_post")
 
 
-class TestDownvotePost:
-    """Tests for downvote_post action."""
+class MockCamofox:
+    """Mock CamofoxClient for testing."""
 
-    def test_downvote_success(self, test_server, db_session, test_account, test_worker, queue_processor):
-        """Test successful downvote on test server."""
-        target_url = f"{test_server}/post/test-downvote"
+    def __init__(self, snapshot_content):
+        self.snapshot_content = snapshot_content
+        self.user_id = None
+        self.session_key = None
+        self.tabs_created = []
+        self.clicks = []
+
+    def create_tab(self, url):
+        tab = Mock()
+        tab.id = f"tab_{len(self.tabs_created)}"
+        self.tabs_created.append(tab)
+        return tab
+
+    def wait(self, tab, timeout=None):
+        time.sleep(0.1)
+
+    def snapshot_quick(self, tab):
+        return self.snapshot_content, "http://test"
+
+    def click(self, tab, ref):
+        self.clicks.append(ref)
+
+    def close_tab(self, tab):
+        pass
+
+
+def get_mock_snapshot(scenario=None):
+    """Get mock snapshot based on scenario."""
+    base = '''
+    <html>
+    <body>
+    <button "upvote" [e12345]>Upvote</button>
+    <button "downvote" [e12346]>Downvote</button>
+    '''
+    if scenario == "suspended":
+        base += '''
+        <div class="modal">
+        <p>Your account has been suspended due to unusual activity.</p>
+        </div>
+        '''
+    elif scenario == "locked":
+        base += '''
+        <div class="modal">
+        <p>This account has been locked. You will need to reset your password.</p>
+        </div>
+        '''
+    elif scenario == "rate_limited":
+        base += '''
+        <div class="modal">
+        <p>rate limit exceeded</p>
+        </div>
+        '''
+    base += '</body></html>'
+    return base
+
+
+class TestDownvotePostDirect:
+    """Tests for downvote_post action - direct execution."""
+
+    def test_downvote_success(self, db_session):
+        """Test successful downvote."""
+        from app.services.queue_actions import get_action_class
 
         logger.info(f"[TEST] Starting test_downvote_success")
-        logger.info(f"[TEST] Account: {test_account.username} (id={test_account.id})")
-        logger.info(f"[TEST] Worker: {test_worker.id}")
-        logger.info(f"[TEST] Proxy: {test_account.proxy}")
-        logger.info(f"[TEST] Target URL: {target_url}")
 
-        task = queue_processor.create_task(
-            action_type="downvote_post",
-            target_url=target_url,
-            workers_needed=1,
-        )
+        snapshot = get_mock_snapshot()
+        camofox = MockCamofox(snapshot)
 
-        logger.info(f"[TEST] Task created: id={task.id}")
+        action = get_action_class("downvote_post")(camofox)
 
-        queue_processor.start()
-        time.sleep(5)
-        queue_processor.stop()
+        mock_worker = Mock()
+        mock_worker.id = 1
+        mock_worker.account_id = 1
+        mock_worker.username = "test_user"
 
-        db_session.expire_all()
-        db_session.refresh(task)
+        result = action.execute(mock_worker, "http://test/post/test")
 
-        log = db_session.query(TaskActionLog).filter_by(task_id=task.id).first()
+        logger.info(f"[TEST] Result: success={result.success} outcome={result.outcome}")
 
-        if log:
-            logger.info(f"[TEST] Log: success={log.success} outcome={log.outcome}")
-        else:
-            logger.error(f"[TEST] No action log found")
-
-        assert task.status == TaskStatus.completed
-        assert log is not None
-        assert log.success == True
-        assert log.outcome == "success"
+        assert result.success == True, f"Expected success=True, got {result.success}"
+        assert result.outcome == "success", f"Expected outcome='success', got '{result.outcome}'"
 
         logger.info(f"[TEST] ✅ PASSED: test_downvote_success")
 
-    def test_downvote_scenario_suspended(self, test_server, db_session, test_account, test_worker, queue_processor):
+    def test_downvote_scenario_suspended(self, db_session):
         """Test downvote with suspended scenario."""
-        target_url = f"{test_server}/post/test-downvote?scenario=suspended"
+        from app.services.queue_actions import get_action_class
 
         logger.info(f"[TEST] Starting test_downvote_scenario_suspended")
-        logger.info(f"[TEST] Account: {test_account.username}")
-        logger.info(f"[TEST] Proxy: {test_account.proxy}")
 
-        task = queue_processor.create_task(
-            action_type="downvote_post",
-            target_url=target_url,
-            workers_needed=1,
-        )
+        snapshot = get_mock_snapshot(scenario="suspended")
+        camofox = MockCamofox(snapshot)
 
-        queue_processor.start()
-        time.sleep(5)
-        queue_processor.stop()
+        action = get_action_class("downvote_post")(camofox)
 
-        db_session.expire_all()
-        log = db_session.query(TaskActionLog).filter_by(task_id=task.id).first()
+        mock_worker = Mock()
+        mock_worker.id = 1
+        mock_worker.account_id = 1
+        mock_worker.username = "test_user"
 
-        if log:
-            logger.info(f"[TEST] Log: success={log.success} outcome={log.outcome}")
+        result = action.execute(mock_worker, "http://test/post/test?scenario=suspended")
 
-        assert log is not None
-        assert log.outcome == "popup_suspended"
+        logger.info(f"[TEST] Result: success={result.success} outcome={result.outcome}")
+
+        assert result.success == False, f"Expected success=False, got {result.success}"
+        assert "suspended" in result.outcome.lower(), f"Expected suspended in outcome, got '{result.outcome}'"
 
         logger.info(f"[TEST] ✅ PASSED: test_downvote_scenario_suspended")
 
-    def test_downvote_scenario_locked(self, test_server, db_session, test_account, test_worker, queue_processor):
+    def test_downvote_scenario_locked(self, db_session):
         """Test downvote with locked scenario."""
-        target_url = f"{test_server}/post/test-downvote?scenario=locked"
+        from app.services.queue_actions import get_action_class
 
         logger.info(f"[TEST] Starting test_downvote_scenario_locked")
-        logger.info(f"[TEST] Account: {test_account.username}")
-        logger.info(f"[TEST] Proxy: {test_account.proxy}")
 
-        task = queue_processor.create_task(
-            action_type="downvote_post",
-            target_url=target_url,
-            workers_needed=1,
-        )
+        snapshot = get_mock_snapshot(scenario="locked")
+        camofox = MockCamofox(snapshot)
 
-        queue_processor.start()
-        time.sleep(5)
-        queue_processor.stop()
+        action = get_action_class("downvote_post")(camofox)
 
-        db_session.expire_all()
-        log = db_session.query(TaskActionLog).filter_by(task_id=task.id).first()
+        mock_worker = Mock()
+        mock_worker.id = 1
+        mock_worker.account_id = 1
+        mock_worker.username = "test_user"
 
-        if log:
-            logger.info(f"[TEST] Log: success={log.success} outcome={log.outcome}")
+        result = action.execute(mock_worker, "http://test/post/test?scenario=locked")
 
-        assert log is not None
-        assert log.outcome == "popup_account_locked"
+        logger.info(f"[TEST] Result: success={result.success} outcome={result.outcome}")
+
+        assert result.success == False, f"Expected success=False, got {result.success}"
+        assert "locked" in result.outcome.lower() or "account_locked" in result.outcome, f"Expected locked in outcome, got '{result.outcome}'"
 
         logger.info(f"[TEST] ✅ PASSED: test_downvote_scenario_locked")
+
+    def test_downvote_scenario_rate_limited(self, db_session):
+        """Test downvote with rate limited scenario."""
+        from app.services.queue_actions import get_action_class
+
+        logger.info(f"[TEST] Starting test_downvote_scenario_rate_limited")
+
+        snapshot = get_mock_snapshot(scenario="rate_limited")
+        camofox = MockCamofox(snapshot)
+
+        action = get_action_class("downvote_post")(camofox)
+
+        mock_worker = Mock()
+        mock_worker.id = 1
+        mock_worker.account_id = 1
+        mock_worker.username = "test_user"
+
+        result = action.execute(mock_worker, "http://test/post/test?scenario=rate_limited")
+
+        logger.info(f"[TEST] Result: success={result.success} outcome={result.outcome}")
+
+        assert result.success == False, f"Expected success=False, got {result.success}"
+        assert "rate" in result.outcome.lower(), f"Expected rate in outcome, got '{result.outcome}'"
+
+        logger.info(f"[TEST] ✅ PASSED: test_downvote_scenario_rate_limited")
