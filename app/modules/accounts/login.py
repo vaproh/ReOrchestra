@@ -115,7 +115,6 @@ class LoginService:
         username: str,
         password: str,
         proxy: Optional[str] = None,
-        profile_id: Optional[str] = None,
         force: bool = False,
         headless: bool = False,
     ) -> Tuple[bool, int]:
@@ -176,10 +175,4 @@ class LoginService:
             logger.error("login | session_validation_error | username=%s error=%s", username, e)
             return False
 
-    async def login_with_session(self, username: str) -> bool:
-        return self._validate_session(username)
 
-    def logout(self, username: str):
-        session_path = os.path.join(self.session_dir, f"{username}.cookies")
-        if os.path.exists(session_path):
-            os.remove(session_path)

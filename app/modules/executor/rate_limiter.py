@@ -101,6 +101,3 @@ class RateLimiter:
             "active_hours": f"{account.active_hours_start}-{account.active_hours_end}",
         }
 
-
-def get_rate_limiter() -> RateLimiter:
-    return RateLimiter()

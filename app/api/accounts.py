@@ -1,9 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
-import random
 import os
-import hashlib
 
 from app.database import get_db, Account, AccountStatus, AccountType
 from app.models import TaskExecutionLog
@@ -15,11 +13,9 @@ from app.schemas.account import (
     BatchDeleteRequest,
     LoginRequest,
     BatchLoginRequest,
-    AccountCreate,
 )
-from app.schemas.common import SuccessResponse, PaginationMeta
+from app.schemas.common import SuccessResponse
 from app.config import get_settings
-from app.modules.executor.browser import list_profile_ids
 
 router = APIRouter()
 
@@ -53,7 +49,6 @@ async def import_accounts(
             email=acc_data.email,
             email_password=acc_data.email_password,
             proxy=acc_data.proxy,
-            profile_id=acc_data.profile_id or (random.choice(list_profile_ids()) if list_profile_ids() else None),
             account_type=AccountType[request.account_type],
             status=AccountStatus.fresh,
         )

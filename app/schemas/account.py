@@ -9,7 +9,6 @@ class AccountBase(BaseModel):
     email: Optional[str] = None
     email_password: Optional[str] = None
     proxy: Optional[str] = None
-    profile_id: Optional[str] = None
     account_type: str = "upvoter"
 
 
@@ -21,15 +20,6 @@ class AccountImport(AccountBase):
     pass
 
 
-class AccountUpdate(BaseModel):
-    status: Optional[str] = None
-    account_type: Optional[str] = None
-    proxy: Optional[str] = None
-    profile_id: Optional[str] = None
-    fail_count: Optional[int] = None
-    email_verified: Optional[bool] = None
-
-
 class AccountResponse(BaseModel):
     id: int
     username: str
@@ -38,7 +28,6 @@ class AccountResponse(BaseModel):
     karma_total: int
     email_verified: bool
     proxy: Optional[str]
-    profile_id: Optional[str]
     last_used: Optional[datetime]
     fail_count: int
     created_at: datetime
@@ -59,7 +48,6 @@ class AccountDetailResponse(BaseModel):
     email: Optional[str]
     email_verified: bool
     proxy: Optional[str]
-    profile_id: Optional[str]
     cookies_present: bool = False
     session_valid: bool = False
     session_age_hours: Optional[float] = None

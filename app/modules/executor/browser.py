@@ -1,4 +1,3 @@
-import json
 import time
 import logging
 import requests
@@ -155,44 +154,3 @@ class CamofoxClient:
         )
         resp.raise_for_status()
         return resp.json()
-
-
-# Convenience functions for backward compatibility
-def create_browser_session(proxy=None, headless=False, profile_id=None):
-    """Create a Camofox client (REST API-based, not Selenium).
-
-    Proxy is configured via env vars when Camofox server starts, not per-session.
-    """
-    return CamofoxClient()
-
-
-def close_browser(client: CamofoxClient):
-    if client:
-        # Just disconnect - don't kill the Camofox server
-        pass
-
-
-# Profile functions kept for compatibility
-_profiles_cache: Optional[dict] = None
-
-
-def load_profiles() -> Optional[dict]:
-    global _profiles_cache
-    if _profiles_cache is None:
-        settings = get_settings()
-        with open(settings.profiles_path) as f:
-            _profiles_cache = json.load(f)
-    return _profiles_cache
-
-
-def get_profile(profile_id: str) -> Optional[dict]:
-    profiles = load_profiles() or {}
-    for p in profiles.get("profiles", []):
-        if p["id"] == profile_id:
-            return p
-    return None
-
-
-def list_profile_ids() -> list[str]:
-    profiles = load_profiles() or {}
-    return [p["id"] for p in profiles.get("profiles", [])]

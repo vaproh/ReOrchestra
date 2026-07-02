@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/reddit.db"
     session_dir: str = "data/sessions"
     log_dir: str = "data/logs"
-    profiles_path: str = "profiles.json"
 
     # ===== CAMOFOX =====
     camofox_port: int = 9377

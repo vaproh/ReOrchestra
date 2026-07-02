@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 import requests as http_requests
 import logging
 
-from app.database import get_db, Account, Post, Proxy
+from app.database import get_db, Account, Proxy
 from app.models import TaskExecutionLog, CamofoxSlot
-from app.models import AccountStatus, AccountType, PostStatus
+from app.models import AccountStatus, AccountType
 from app.schemas.common import SuccessResponse
 from app.config import get_settings
 
@@ -90,10 +90,6 @@ async def get_stats(db: Session = Depends(get_db)):
         "login": 0,
     }
 
-    total_posts = db.query(func.count(Post.id)).scalar() or 0
-    posted_posts = db.query(func.count(Post.id)).filter(Post.status == PostStatus.posted).scalar() or 0
-    total_karma = db.query(func.sum(Post.karma_gained)).scalar() or 0
-
     total_proxies = db.query(func.count(Proxy.id)).scalar() or 0
 
     votes_today = db.query(func.sum(Account.votes_today)).scalar() or 0
@@ -125,11 +121,6 @@ async def get_stats(db: Session = Depends(get_db)):
         "sessions": {
             "avg_age_hours": 0.0,
             "expiring_soon": 0,
-        },
-        "posts": {
-            "total": total_posts,
-            "posted": posted_posts,
-            "total_karma_gained": total_karma,
         },
         "slots": slot_stats,
     })

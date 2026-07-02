@@ -49,14 +49,7 @@ class StatsSessions(BaseModel):
     expiring_soon: int
 
 
-class StatsPosts(BaseModel):
-    total: int
-    posted: int
-    total_karma_gained: int
-
-
 class StatsResponse(BaseModel):
     accounts: StatsAccounts
     actions: StatsActions
     sessions: StatsSessions
-    posts: StatsPosts

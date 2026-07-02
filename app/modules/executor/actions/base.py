@@ -236,11 +236,3 @@ class BaseAction:
         if popup:
             return False, popup
         return True, None
-
-
-def dedup_hash(account_id: int, action_type: str, target_url: str) -> str:
-    """SHA-256[:16] of account_id:action_type:target_url.
-    Prevents the same account succeeding the same action on the same target twice.
-    """
-    raw = f"{account_id}:{action_type}:{target_url}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]

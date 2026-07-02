@@ -25,13 +25,6 @@ class AccountType(str, enum.Enum):
     both = "both"
 
 
-class PostStatus(str, enum.Enum):
-    draft = "draft"
-    posted = "posted"
-    failed = "failed"
-    deleted = "deleted"
-
-
 class Account(Base):
     __tablename__ = "accounts"
 
@@ -46,7 +39,7 @@ class Account(Base):
     bearer_token = Column(String(512), nullable=True)
     user_agent = Column(String(256), nullable=True)
     proxy = Column(String(64), nullable=True)
-    profile_id = Column(String(32), nullable=True)
+
 
     status = Column(SQLEnum(AccountStatus), default=AccountStatus.fresh)
     account_type = Column(SQLEnum(AccountType), default=AccountType.upvoter)
@@ -76,39 +69,6 @@ class Account(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    posts = relationship("Post", back_populates="account")
-
-
-class Post(Base):
-    __tablename__ = "posts"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    account_username = Column(String(20), nullable=False)
-
-    post_type = Column(String(16), nullable=False)
-    target_type = Column(String(16), nullable=False)
-    target = Column(String(128), nullable=False)
-    title = Column(String(300), nullable=False)
-    body = Column(Text, nullable=True)
-    flair_id = Column(String(64), nullable=True)
-
-    post_url = Column(String(512), nullable=True)
-    post_id = Column(String(16), nullable=True)
-    status = Column(SQLEnum(PostStatus), default=PostStatus.draft)
-
-    karma_gained = Column(Integer, default=0)
-    upvotes_received = Column(Integer, default=0)
-    comments_count = Column(Integer, default=0)
-
-    scheduled_for = Column(DateTime, nullable=True)
-    posted_at = Column(DateTime, nullable=True)
-    error_message = Column(Text, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    account = relationship("Account", back_populates="posts")
 
 
 class Proxy(Base):
@@ -154,36 +114,6 @@ class CamofoxSlot(Base):
 
     memory_mb = Column(Integer, nullable=True)
     cpu_percent = Column(Integer, nullable=True)
-
-
-class ActionLog(Base):
-    __tablename__ = "action_log"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    target_id = Column(String(64), nullable=True)
-    target_url = Column(Text, nullable=True)
-    action_type = Column(String(20), nullable=False)
-    action_value = Column(String(16), nullable=True)
-    success = Column(Boolean, default=True)
-    error = Column(Text, nullable=True)
-    http_status = Column(Integer, nullable=True)
-
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    duration_ms = Column(Integer, nullable=True)
-
-    dedup_hash = Column(String(64), unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class Config(Base):
-    __tablename__ = "config"
-
-    key = Column(String(64), primary_key=True)
-    value = Column(Text, nullable=False)
-    source = Column(String(20), default="runtime")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 # ============================================================
