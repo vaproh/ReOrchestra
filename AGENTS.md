@@ -1,4 +1,4 @@
-# AGENTS.md — ReOrchestra
+# AGENTS.md — ReOrchestra 🚀
 
 ## What Is This Project?
 
@@ -6,7 +6,7 @@
 
 > *"Your Accounts, In Harmony"*
 
-**Philosophy:**
+### Philosophy
 - Simple, not enterprise
 - Single VPS deployment
 - Direct customers only
@@ -58,6 +58,7 @@ ReOrchestra solves this with:
 | **Task** | Job: `{action_type, target_url, workers_needed}` |
 | **TaskExecutionLog** | Per-account execution result |
 | **Deduplication** | SHA256 of `{account_id}:{action_type}:{target_url}` |
+| **QueueProcessor** | Background loop that processes tasks |
 
 ---
 
@@ -73,7 +74,7 @@ Request → FastAPI → Task Queue (SQLite)
               CamofoxClient → Reddit
 ```
 
-**Queue behavior:**
+### Queue Behavior
 - FIFO + priority
 - Max 3 concurrent accounts per task (configurable)
 - Auto-retry 3 times before marking failed
@@ -84,42 +85,95 @@ Request → FastAPI → Task Queue (SQLite)
 
 ---
 
+## Project Structure
+
+```
+app/
+├── main.py                    # FastAPI entry, CORS, lifespan
+├── config.py                 # Pydantic Settings from .env
+├── database.py               # SQLAlchemy engine, get_db
+├── logging_config.py         # Logging setup
+│
+├── logging/                  # Logging utilities
+│   ├── __init__.py
+│   ├── audit.py             # audit() for audit trail
+│   ├── redact.py            # redact_password(), redact_proxy()
+│   ├── structured.py        # StructuredFormatter
+│   └── timing.py           # timed_operation() context manager
+│
+├── api/                      # FastAPI routers
+│   ├── accounts.py           # /api/accounts/*
+│   ├── queue_tasks.py       # /api/tasks/*
+│   ├── queue_queue.py       # /api/queue/*
+│   ├── proxies.py          # /api/proxies/*
+│   ├── admin.py            # /api/admin/*
+│   └── router.py           # Central router
+│
+├── models/                   # SQLAlchemy models
+│   └── __init__.py          # Account, Proxy, Task, TaskExecutionLog
+│
+├── schemas/                  # Pydantic schemas
+│   ├── account.py
+│   └── common.py
+│
+└── modules/
+    ├── accounts/            # Account management
+    │   └── login.py         # LoginService
+    │
+    ├── queue/              # Queue processing
+    │   ├── __init__.py     # QueueManager singleton
+    │   └── processor.py    # QueueProcessor (background loop)
+    │
+    ├── executor/            # Browser automation
+    │   ├── browser.py      # CamofoxClient
+    │   ├── rate_limiter.py # RateLimiter
+    │   └── actions/
+    │       ├── base.py     # BaseAction
+    │       └── actions.py  # 9 action classes + ACTIONS dict
+    │
+    └── shared/              # Shared utilities
+        ├── config.py       # ConfigService (YAML)
+        └── exceptions.py   # Custom exceptions
+```
+
+---
+
 ## API Endpoints
 
 ### Accounts
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/accounts/import` | Import accounts |
-| POST | `/api/accounts/login` | Login via Camofox |
-| GET | `/api/accounts` | List accounts |
-| GET | `/api/accounts/{id}` | Get account details |
-| PATCH | `/api/accounts/{id}` | Update account |
-| DELETE | `/api/accounts/{id}` | Delete account |
+| `POST` | `/api/accounts/import` | Import accounts |
+| `POST` | `/api/accounts/login` | Login via Camofox |
+| `GET` | `/api/accounts` | List accounts |
+| `GET` | `/api/accounts/{id}` | Get account details |
+| `PATCH` | `/api/accounts/{id}` | Update account |
+| `DELETE` | `/api/accounts/{id}` | Delete account |
 
 ### Tasks
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/tasks` | Create task |
-| GET | `/api/tasks` | List tasks |
-| GET | `/api/tasks/{id}` | Get task status |
-| POST | `/api/tasks/{id}/cancel` | Cancel task |
+| `POST` | `/api/tasks` | Create task |
+| `GET` | `/api/tasks` | List tasks |
+| `GET` | `/api/tasks/{id}` | Get task status |
+| `POST` | `/api/tasks/{id}/cancel` | Cancel task |
 
 ### Queue
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/queue/start` | Start queue |
-| POST | `/api/queue/stop` | Stop queue |
-| GET | `/api/queue/status` | Queue status |
+| `POST` | `/api/queue/start` | Start queue |
+| `POST` | `/api/queue/stop` | Stop queue |
+| `GET` | `/api/queue/status` | Queue status |
 
 ### Admin
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/admin/health` | Health check |
-| GET | `/api/admin/stats` | Statistics |
+| `GET` | `/api/admin/health` | Health check |
+| `GET` | `/api/admin/stats` | Statistics |
 
 ---
 
@@ -138,6 +192,50 @@ Request → FastAPI → Task Queue (SQLite)
 | `app/modules/executor/browser.py` | CamofoxClient |
 | `app/modules/accounts/login.py` | LoginService |
 | `app/modules/executor/rate_limiter.py` | RateLimiter |
+| `app/logging/__init__.py` | Logging utilities exports |
+| `app/logging/redact.py` | Sensitive data redaction |
+| `app/logging/timing.py` | Performance tracking |
+| `app/logging/audit.py` | Audit trail logging |
+
+---
+
+## Logging
+
+Logs are written to `data/logs/app_YYYYMMDD_HHMMSS.log`
+
+### Loggers
+
+| Logger | Module |
+|--------|--------|
+| `accounts` | API accounts endpoints |
+| `tasks` | API task endpoints |
+| `queue_api` | API queue endpoints |
+| `proxies` | API proxy endpoints |
+| `admin` | API admin endpoints |
+| `queue` | QueueProcessor |
+| `queue_manager` | QueueManager |
+| `login` | LoginService |
+| `browser` | CamofoxClient |
+| `rate_limiter` | RateLimiter |
+| `base_action` | BaseAction |
+| `actions` | Action implementations |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL` | `INFO` | Console log level (set `DEBUG` for verbose) |
+
+### Sensitive Data Redaction
+
+Passwords and proxy credentials are automatically redacted:
+
+```python
+from app.logging.redact import redact_password, redact_proxy
+
+redact_password("secret123")  # "****23"
+redact_proxy("http://user:pass@host:8080")  # "host:8080"
+```
 
 ---
 
@@ -192,15 +290,15 @@ Request → FastAPI → Task Queue (SQLite)
 
 ## Outcome Codes
 
-| Outcome | Meaning |
-|---------|---------|
-| `success` | Action completed |
-| `popup_suspended` | Account locked via popup |
-| `popup_rate_limited` | Rate limited via popup |
-| `header_banned` | Banned via header banner |
-| `header_suspended` | Suspended via header banner |
-| `click_timeout` | Button click timed out |
-| `element_not_found` | Target element not found |
+| Outcome | Meaning | Action |
+|---------|---------|--------|
+| `success` | Action completed | - |
+| `popup_suspended` | Account locked via popup | Mark dead, replace |
+| `popup_rate_limited` | Rate limited via popup | Mark rate_limited, replace |
+| `header_banned` | Banned via header banner | Mark dead, replace |
+| `header_suspended` | Suspended via header banner | Mark dead, replace |
+| `click_timeout` | Button click timed out | Retry 3x |
+| `element_not_found` | Target element not found | Retry 3x |
 
 ---
 
@@ -263,21 +361,15 @@ Commands via [`just`](https://just.systems/):
 | `just logs-clear` | Clear logs |
 | `just clean` | Clean cache |
 
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LOG_LEVEL` | `INFO` | Console log level (set `DEBUG` for verbose) |
-
 ---
 
 ## Code Conventions
 
-- Python 3.x, type hints everywhere
+- Python 3.10+, type hints everywhere
 - Pydantic v2 for schemas
 - SQLAlchemy 2.x declarative base
 - Logging: `logger = logging.getLogger("name")`
-- Format: `%(asctime)s | %(levelname)s | %(name)s | %(message)s`
+- Format: `%(asctime)s | %(levelname)-8s | %(name)s | %(message)s`
 - Import order: stdlib → third-party → local
 
 ---
@@ -290,3 +382,5 @@ Commands via [`just`](https://just.systems/):
 - **Proxy per session**: Via sticky-proxy plugin
 - **Database**: SQLite at `data/reddit.db`
 - **CORS**: Set `CORS_ALLOWED_ORIGINS` in `.env`
+- **Logs**: Written to `data/logs/` with rotation
+- **Sensitive data**: Passwords/proxies automatically redacted in logs
