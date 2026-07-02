@@ -2,7 +2,7 @@
 
 ## 1. Product Overview
 
-**ReOrchestra** is a white-label bulk Reddit account automation tool that enables customers to manage 500-1000 Reddit accounts reliably on a single VPS.
+**ReOrchestra** is a bulk Reddit account automation tool that enables customers to manage 500-1000 Reddit accounts reliably on a single VPS.
 
 > *"Your Accounts, In Harmony"*
 
@@ -20,7 +20,6 @@
 | **SEO agencies** | Manipulate post visibility |
 | **Content creators / OnlyFans** | Build karma to promote content |
 | **Reputation managers** | Suppress negative content |
-| **Political campaigns** | Astroturfing (acknowledged risk) |
 
 **Not target:** Public SaaS marketplace. Direct relationships only.
 
@@ -37,17 +36,17 @@
 | **Business** | Up to 500 | ~$300/mo |
 | **Enterprise** | Unlimited (sell as "unlimited", actual ~1000) | ~$500/mo |
 
-**Note:** Single VPS can handle ~500-1000 accounts. Enterprise tier sells as "unlimited" to commercial users who don't probe the limit.
+**Note:** Single VPS can handle ~500-1000 accounts.
 
-### Unit Economics (Operator View)
+### Unit Economics
 
 | Cost | Amount |
 |------|--------|
 | VPS (Hetzner CX22) | $3.20/mo |
-| Residential proxies | $1/GB (shared pool) |
+| Residential proxies | $1/GB |
 | **Total per 500 accounts** | ~$10-20/mo |
 
-**Margin:** ~95%+ at 500 accounts, $300/mo revenue.
+**Margin:** ~95%+ at 500 accounts.
 
 ---
 
@@ -58,7 +57,7 @@
 1. **Account Management**
    - Import Reddit accounts (username + password + proxy)
    - Login via Camofox stealth browser
-   - Track account health (active/paused/dead)
+   - Track account health (active/dead/banned)
    - Automatic session renewal
 
 2. **Queue-Based Action Execution**
@@ -66,6 +65,7 @@
    - Background processor handles FIFO queue
    - Automatic retries (3x with exponential backoff)
    - Deduplication prevents double-execution
+   - Failed accounts replaced automatically
 
 3. **9 Supported Actions**
    - Voting: upvote_post, downvote_post, upvote_comment, downvote_comment
@@ -76,14 +76,13 @@
 4. **Detection Avoidance**
    - Per-account rate limiting (15 votes/day, 100/week)
    - S-curve timing with jitter
-   - Proxy injection per session (sticky-proxy)
+   - Proxy injection per session
    - Camofox fingerprint spoofing
 
 5. **Account Health Intelligence**
-   - Burn detection (5 consecutive failures → dead)
+   - Burn detection (consecutive failures → dead)
    - Success rate monitoring
-   - Automatic pause on suspension
-   - Dead marking on banned
+   - Automatic mark on suspension/banned
 
 ---
 
@@ -95,194 +94,188 @@
 |-----------|------------|
 | API | FastAPI + Uvicorn |
 | Database | SQLite + SQLAlchemy 2.x |
-| Browser | Camofox (headless Firefox with C++ anti-detection) |
-| Deployment | Single VPS (Hetzner CX22) |
+| Browser | Camofox (headless Firefox) |
+| Deployment | Single VPS |
 | Sessions | Camofox persistence plugin |
-| Proxy | Per-account via sticky-proxy plugin |
+| Proxy | Per-account via sticky-proxy |
 
 ### Design Philosophy
 
-- **Niche tool, not enterprise** — no over-engineering
-- **Reliable, not instant** — actions queue and process in background
+- **Simple, not enterprise** — no over-engineering
+- **Reliable, not instant** — queue processes in background
 - **Single VPS** — no Redis, no horizontal scaling
-- **Direct customers** — no API key auth (internal use only)
+- **Direct customers** — no API key auth
 
 ### Constraints
 
 - Single Camofox instance (port 9377)
-- Max ~1000 accounts per VPS (memory/proxy pool constraint)
-- SQLite single-writer (sufficient for this scale)
-- No public marketplace (direct relationships only)
+- Max ~1000 accounts per VPS
+- SQLite single-writer
 
 ---
 
-## 5.5 Queue System Design
+## 6. Queue System Design
 
-### Core Queue Behaviors
+### How It Works
 
-The system operates as a simplified task-based queue:
-1. **Task Creation**: Create task specifying action, target URL, and total workers needed: `{ action: "upvote_post", url: "...", workers_needed: 100 }`.
-2. **Account Selection**: Select idle, active accounts that have not already successfully executed this action on this target.
-3. **Concurrent Execution**: Run task actions concurrently, constrained by a configuration limit (default max 3 concurrent executions).
-4. **Auto-Replacement on Ban/Suspend**: If an account fails due to being banned or suspended, mark it dead/banned, and dynamically assign a new idle account to replace it.
-5. **Success Handling**: Mark account action as completed and update task counts on success.
-6. **Retry with Backoff**: For retryable errors (like click timeout or element not found), retry up to $N$ times (default 3) before marking the attempt as failed.
-7. **Execution Termination**: Continue processing until the requested `workers_needed` count is satisfied, or no more eligible accounts are left.
-8. **Task Completion Tracking**: Track final execution status (completed, partial, or failed).
+```
+USER: "upvote this post with 100 accounts"
+
+SYSTEM:
+  1. Create task: { action: "upvote_post", url: "...", workers_needed: 100 }
+  2. Pick 100 idle accounts (that haven't already upvoted this)
+  3. Execute concurrently (max 3 at a time)
+  4. If account fails (ban/suspend):
+     - Mark account dead/banned
+     - Assign NEW account to replace it
+  5. If rate limit/retryable: retry 3 times
+  6. Continue until workers_needed satisfied or no accounts left
+```
+
+### Core Behaviors
+
+1. **Task Creation** — saved to DB with status `queued`
+2. **Account Selection** — idle accounts that haven't done this action
+3. **Concurrent Execution** — max 3 at a time (configurable)
+4. **Auto-Replacement** — ban/suspend → mark dead, assign new account
+5. **Retry with Backoff** — 3 retries for retryable errors
+6. **Deduplication** — SHA256 of `{account_id}:{action_type}:{target_url}`
 
 ### Error Handling
 
-| Error Outcome / Code | Action Taken |
-|----------------------|--------------|
-| `popup_suspended` | Mark account `dead`, assign new account to replace |
-| `popup_rate_limited` | Mark account `rate_limited`, assign new account to replace |
-| `header_banned` | Mark account `dead`, assign new account to replace |
-| `header_suspended` | Mark account `dead`, assign new account to replace |
-| `click_timeout` | Retry up to N times (default 3) before failure |
-| `element_not_found` | Retry up to N times (default 3) before failure |
+| Error | Action |
+|-------|--------|
+| `popup_suspended` | Mark `dead`, replace account |
+| `popup_rate_limited` | Mark `rate_limited`, replace account |
+| `header_banned` | Mark `dead`, replace account |
+| `header_suspended` | Mark `dead`, replace account |
+| `click_timeout` | Retry 3x |
+| `element_not_found` | Retry 3x |
 
 ### Account Status Flow
 
-```mermaid
-graph TD
-    fresh[fresh] --> logged_in[logged_in]
-    logged_in --> session_expired[session_expired]
-    logged_in --> rate_limited[rate_limited]
-    rate_limited -->|After Cooldown| logged_in
-    logged_in --> dead[banned / dead]
-    session_expired --> dead
+```
+fresh → logged_in → session_expired → dead
+              ↓
+        rate_limited (temp)
+              ↓
+        logged_in (after cooldown)
 ```
 
 ### Task States
 
-Tasks transition through the following states:
-`queued` ➔ `running` ➔ `completed` | `partial` | `failed` | `cancelled`
+```
+queued → running → completed | partial | failed | cancelled
+```
 
 ---
 
-## 6. User Workflow
+## 7. User Workflow
 
 ```
 1. IMPORT ACCOUNTS
-   → Customer provides: username, password, proxy
    → POST /api/accounts/import
+   { accounts: [{ username, password, proxy }] }
 
 2. LOGIN ACCOUNTS
-   → Camofox automation logs in, saves cookies
    → POST /api/accounts/login
+   { account_ids: [1,2,3] }
 
-3. CREATE WORKERS
-   → Workers bound to accounts, status = idle
-   → POST /api/workers/bulk
-
-4. CREATE TASK
-   → Specify action + target URL + number of workers
+3. CREATE TASK
    → POST /api/tasks
    {
      "action_type": "upvote_post",
-     "target_url": "https://www.reddit.com/r/...",
+     "target_url": "https://old.reddit.com/r/...",
      "workers_needed": 50
    }
 
-5. MONITOR
+4. MONITOR
    → GET /api/tasks/{id}
-   → Task status: queued → running → completed | partial | failed
+   → Status: queued → running → completed | partial | failed
 ```
 
 ---
 
-## 7. Anti-Detection Strategy
+## 8. Anti-Detection
 
-### Rate Limiting
+### Rate Limits (per account)
 
 ```yaml
-rate_limits:
-  max_votes_per_day: 15
-  max_votes_per_week: 100
-  min_seconds_between_votes: 120
-  max_vote_only_ratio: 0.3
+max_votes_per_day: 15
+max_votes_per_week: 100
+min_seconds_between_votes: 120
+max_vote_only_ratio: 0.3
 ```
 
-### Timing Entropy
+### Timing
 
 ```yaml
-timing:
-  jitter_sigma: 120        # Gaussian jitter (seconds)
-  skip_cycle_chance: 0.08   # 8% skip chance
-  clump_chance: 0.15        # 15% clump chance
-  micro_jitter_min_ms: 100
-  micro_jitter_max_ms: 900
+jitter_sigma: 120        # Gaussian jitter (seconds)
+skip_cycle_chance: 0.08  # 8% skip chance
+clump_chance: 0.15       # 15% clump chance
 ```
 
 ### Burn Detection
 
 ```yaml
-burn_detection:
-  consecutive_failures_threshold: 5
-  success_rate_window_days: 7
-  min_success_rate: 0.80
-  cooldown_hours: 24
+consecutive_failures_threshold: 5
+success_rate_window_days: 7
+min_success_rate: 0.80
+cooldown_hours: 24
 ```
 
 ---
 
-## 8. Key Decisions
+## 9. Key Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| **SQLite over PostgreSQL** | Single VPS, ~1000 accounts, no horizontal scaling needed |
-| **Camofox over Playwright** | C++-level fingerprint spoofing, better anti-detection |
-| **FIFO + priority queue** | Simple, predictable ordering |
-| **3 retries, exponential backoff** | Balance between success rate and queue depth |
-| **Dedup by worker+action+target** | Prevents same worker doing same action twice |
-| **Popup detection AFTER vote** | Popup only appears after attempting the action |
-| **Banner detection BEFORE non-vote** | Banner is visible before attempting the action |
+| SQLite | Single VPS, ~1000 accounts, no scaling needed |
+| Camofox | C++-level fingerprint spoofing |
+| Task-based queue | Simple: accounts ARE the workers |
+| 3 retries | Balance success rate vs queue depth |
+| Dedup by account+action+target | Prevents duplicate work |
+| Popup AFTER vote | Popup only appears after click |
+| Banner BEFORE non-vote | Banner shows before action |
 
 ---
 
-## 9. What Success Looks Like
+## 10. What Success Looks Like
 
 - Queue processes 500+ accounts reliably
 - Accounts survive weeks/months without burning
-- Minimal manual intervention (pause dead accounts)
+- Minimal manual intervention
 - Task success rate > 90%
 - Single VPS handles all load
-- Customer pays monthly subscription, gets results
 
 ---
 
-## 10. Out of Scope
+## 11. Out of Scope
 
 - Redis / horizontal scaling
-- Prometheus metrics
 - WebSocket real-time updates
 - Encrypted credentials
-- API authentication (direct customers only)
+- API authentication
 - Account creation (customers bring their own)
-- Public marketplace / multi-tenant SaaS
-- Payment processing (direct PayPal/crypto)
+- Public marketplace
+- Payment processing
 
 ---
 
-## 11. Roadmap
+## 12. Roadmap
 
-### Phase 1: Critical Fixes
-- [x] Proxy injection in login
-- [x] Parallel worker execution
-- [x] DB session lifecycle fix
-- [x] RateLimiter integration
+### Phase 1: Foundation
+- [x] Account import/login
+- [x] Queue processor
+- [x] 9 actions
+- [x] Rate limiting
 
 ### Phase 2: Reliability
-- [ ] Dead letter queue
 - [ ] Graceful shutdown
-- [ ] Cancellation tokens
+- [ ] True cancellation (stop in-flight)
+- [ ] Session health monitoring
 
-### Phase 3: Dashboard
-- [ ] Better UX for 500+ accounts
-- [ ] Real-time worker activity
-- [ ] Dead letter queue view
-
-### Phase 4: Cleanup
-- [ ] Remove legacy action system
-- [ ] Fix technical debt
-- [ ] Unit tests
+### Phase 3: Frontend
+- [ ] HTMX + Jinja2 dashboard
+- [ ] Real-time task progress
+- [ ] Account management UI

@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ReOrchestra",
-    version="1.0.0",
+    version="0.9.0",
     lifespan=lifespan,
 )
 
@@ -70,12 +70,3 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(router, prefix="/api")
-
-from app.gui import router as gui_router
-app.include_router(gui_router, prefix="/gui")
-
-
-from fastapi.staticfiles import StaticFiles
-
-# Mount the frontend directory to serve the dashboard on the root path
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

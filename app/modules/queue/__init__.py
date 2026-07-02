@@ -34,8 +34,10 @@ class QueueManager:
         return cls._instance
 
     def start(self):
+        logger.debug("QueueManager.start() called")
         with self._lock:
             if self._processor and self._processor.is_running():
+                logger.debug("QueueManager already running")
                 return
             db = SessionLocal()
             self._processor = QueueProcessor(db, self.camofox)
@@ -43,6 +45,7 @@ class QueueManager:
             logger.info("queue_manager | start | processor_started")
 
     def stop(self):
+        logger.debug("QueueManager.stop() called")
         with self._lock:
             if self._processor:
                 self._processor.stop()

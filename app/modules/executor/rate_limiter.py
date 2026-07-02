@@ -1,11 +1,14 @@
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
+import logging
 
 from sqlalchemy.orm import Session
 
 from app.models import Account, TaskExecutionLog
 from app.modules.shared.config import get_config
+
+logger = logging.getLogger("rate_limiter")
 
 
 class RateLimiter:

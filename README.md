@@ -1,138 +1,171 @@
-# ReOrchestra — Your Accounts, In Harmony
+# ReOrchestra 🚀
 
-A white-label bulk Reddit account automation SaaS platform. Manage thousands of Reddit accounts at scale with a robust queue system, stealth browser automation, and intelligent detection avoidance.
+**Your Accounts, In Harmony**
 
-## Key Features
+Bulk Reddit account automation for managing 500-1000 accounts on a single VPS.
+
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/fastapi-0.100+-green.svg)](https://fastapi.tiangolo.com)
+
+---
+
+## ✨ Features
 
 | Feature | Description |
-|---------|-------------|
-| **Queue System** | FIFO task processing with priority boost, deduplication, and automatic retry with exponential backoff |
-| **9 Action Types** | Upvote/downvote posts and comments, follow/unfollow users, join/leave subreddits, save posts |
-| **Camofox Browser Automation** | Stealth headless browser with session persistence, proxy injection, and fingerprint spoofing |
-| **Session Persistence** | Sessions persist across restarts — no re-login required |
-| **Proxy Management** | Sticky-proxy per session with automatic rotation on failure |
-| **Detection Avoidance** | Per-account rate limiting, S-curve timing with jitter, account health monitoring, and burn detection |
+|:---------|:------------|
+| **Queue System** | Task-based: specify action + URL + accounts needed |
+| **9 Actions** | Upvote/downvote, follow/unfollow, join/leave, save |
+| **Camofox Browser** | Stealth headless browser with fingerprint spoofing |
+| **Auto-Retry** | 3 retries with exponential backoff |
+| **Deduplication** | Same account can't do same action twice |
+| **Account Health** | Auto-mark dead on ban/suspend, replace accounts |
 
-## Tech Stack
+---
 
-| Component | Technology |
-|-----------|------------|
-| API Framework | Python 3 + FastAPI |
-| Database | SQLite + SQLAlchemy ORM |
-| Browser Automation | Camofox (headless browser server) |
-| Background Processing | Python threading (QueueProcessor) |
-| Configuration | YAML + Pydantic settings |
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.9+
-- Camofox browser server (port 9377)
+- 🐍 Python 3.10+
+- 🌐 [Camofox](https://github.com/...) browser server (port 9377)
+- 📋 [`just`](https://just.systems/) — command runner
+- ⚡ [`uv`](https://astral.sh/uv/install.sh) — fast package manager
 
-### Installation
+### Install
 
 ```bash
-# Clone and navigate to project
+# 1. Clone
 cd reddit-api
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate     # Windows
+# 2. Install uv (one-time)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies
-pip install -r requirements.txt
+# 3. Install dependencies
+just install
 
-# Create data directories
-mkdir -p data/sessions data/logs
-
-# Configure environment
+# 4. Configure
 cp .env.example .env
 ```
 
-### Running
+### Run
 
 ```bash
-# Start Camofox browser server
-camofox --port 9377
+just dev      # 🚀 Start with auto-reload
+just run      # 🏭 Start production server
+just debug    # 🔍 Start with DEBUG logging
+just logs     # 📋 Tail logs
+```
 
-# Start the API server
+Or manually:
+
+```bash
+camofox --port 9377                          # Start browser
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Access Points
+---
 
-| URL | Description |
-|-----|-------------|
-| `http://localhost:8000/docs` | Swagger UI API documentation |
-| `http://localhost:8000/gui` | Web-based dashboard |
-| `http://localhost:8000/` | API root |
+## 📌 Commands
 
-## Architecture
+| Command | Description |
+|:--------|:------------|
+| `just install` | Setup venv + install deps |
+| `just run` | Start production server |
+| `just dev` | Start with auto-reload |
+| `just debug` | Start with DEBUG logging |
+| `just logs` | Tail logs |
+| `just logs-clear` | Clear logs |
+| `just clean` | Clean cache |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FastAPI Server                           │
-│                                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐         │
-│  │Accounts  │  │Actions   │  │Queue     │  │Admin     │         │
-│  │/api/    │  │/api/    │  │/api/    │  │/api/    │         │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘         │
-│       └─────────────┴─────────────┴─────────────┘               │
-│                           │                                      │
-│                           ▼                                      │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    Service Layer                          │   │
-│  │                                                          │   │
-│  │  LoginService  │  ActionService  │  QueueProcessor       │   │
-│  │  CamofoxClient │  WorkerPool    │  RateLimiter/Burn    │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-              ┌─────────────────────────┐
-              │    Camofox Browser       │
-              │    (localhost:9377)      │
-              │                          │
-              │  • Tab per session       │
-              │  • Proxy injection        │
-              │  • Cookie persistence     │
-              └─────────────────────────┘
+---
+
+## 📖 Usage
+
+### Import Accounts
+
+```bash
+curl -X POST http://localhost:8000/api/accounts/import \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accounts": [
+      {"username": "user1", "password": "pass", "proxy": "http://proxy:8080"}
+    ],
+    "account_type": "upvoter"
+  }'
 ```
 
-## Key Concepts
+### Login Accounts
 
-### Workers
-
-A **worker** is a Reddit account registered with the queue system. Workers process tasks from the queue and execute actions via the Camofox browser.
-
+```bash
+curl -X POST http://localhost:8000/api/accounts/login \
+  -H "Content-Type: application/json" \
+  -d '{"account_ids": [1, 2, 3]}'
 ```
-Worker lifecycle: idle → working → idle (or paused/dead)
+
+### Create Task
+
+```bash
+curl -X POST http://localhost:8000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_type": "upvote_post",
+    "target_url": "https://old.reddit.com/r/...",
+    "workers_needed": 50
+  }'
 ```
+
+### Monitor
+
+```bash
+curl http://localhost:8000/api/tasks/1          # Get task
+curl http://localhost:8000/api/tasks              # List tasks
+```
+
+---
+
+## 🔌 API Endpoints
+
+### Accounts
+
+| Method | Endpoint | Description |
+|:-------|:---------|:------------|
+| `POST` | `/api/accounts/import` | Import accounts |
+| `POST` | `/api/accounts/login` | Login via Camofox |
+| `GET` | `/api/accounts` | List accounts |
+| `GET` | `/api/accounts/{id}` | Get account |
+| `PATCH` | `/api/accounts/{id}` | Update account |
+| `DELETE` | `/api/accounts/{id}` | Delete account |
 
 ### Tasks
 
-A **task** represents a single action to be performed on a target URL. Tasks are processed FIFO with priority support.
-
-```
-Supported action_types:
-  upvote_post, downvote_post, upvote_comment, downvote_comment
-  follow_user, unfollow_user, join_subreddit, leave_subreddit, save_post
-```
+| Method | Endpoint | Description |
+|:-------|:---------|:------------|
+| `POST` | `/api/tasks` | Create task |
+| `GET` | `/api/tasks` | List tasks |
+| `GET` | `/api/tasks/{id}` | Get task |
+| `POST` | `/api/tasks/{id}/cancel` | Cancel task |
 
 ### Queue
 
-The **queue** manages task distribution to workers. The QueueProcessor runs as a background thread, assigning idle workers to tasks until completion.
+| Method | Endpoint | Description |
+|:-------|:---------|:------------|
+| `POST` | `/api/queue/start` | Start processor |
+| `POST` | `/api/queue/stop` | Stop processor |
+| `GET` | `/api/queue/status` | Status |
 
-```
-Task states: queued → running → completed | partial | failed | cancelled
-```
+### Admin
 
-## Supported Actions
+| Method | Endpoint | Description |
+|:-------|:---------|:------------|
+| `GET` | `/api/admin/health` | Health check |
+| `GET` | `/api/admin/stats` | Statistics |
+
+---
+
+## 🎯 Supported Actions
 
 | Action | Description |
-|--------|-------------|
+|:-------|:------------|
 | `upvote_post` | Upvote a Reddit post |
 | `downvote_post` | Downvote a Reddit post |
 | `upvote_comment` | Upvote a Reddit comment |
@@ -143,53 +176,91 @@ Task states: queued → running → completed | partial | failed | cancelled
 | `leave_subreddit` | Leave a subreddit |
 | `save_post` | Save a post |
 
-## Configuration
+---
 
-Configuration files (in `config/`):
+## ⚙️ Configuration
 
-| File | Purpose |
-|------|---------|
-| `default.yaml` | Default configuration values |
-| `custom.yaml` | Runtime overrides (gitignored) |
-
-Key environment variables:
+### Environment Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `sqlite:///./data/reddit.db` | Database path |
+|:---------|:--------|:------------|
+| `DATABASE_URL` | `sqlite:///./data/reddit.db` | Database |
 | `SESSION_DIR` | `data/sessions` | Cookie storage |
-| `CAMOFOX_PORT` | `9377` | Camofox server port |
-| `LOG_LEVEL` | `INFO` | Logging verbosity |
+| `CAMOFOX_PORT` | `9377` | Camofox port |
+| `LOG_LEVEL` | `INFO` | Console log level (`DEBUG` for verbose) |
 
-## Documentation
+---
 
-| Document | Description |
-|----------|-------------|
-| `docs/ARCHITECTURE.md` | System architecture, components, data models |
-| `docs/IMPLEMENTATION.md` | Setup guide, API reference, queue usage |
+## 🏗️ Architecture
 
-## Directory Structure
+```
+Request → FastAPI → Task Queue → QueueProcessor → Executor → Camofox → Reddit
+```
+
+**Flow:**
+1. Task created via API
+2. QueueProcessor picks it up
+3. Assigns idle accounts (max 3 concurrent)
+4. Executes actions via Camofox
+5. On ban/suspend: marks dead, replaces account
+6. On retryable error: retries 3x
+
+---
+
+## 📁 Project Structure
 
 ```
 reddit-api/
 ├── app/
-│   ├── api/              # REST API endpoints
-│   ├── models/           # SQLAlchemy models
-│   ├── schemas/          # Pydantic schemas
-│   ├── services/        # Business logic
-│   │   ├── queue_actions/  # 9 action executors
-│   │   ├── queue_processor.py
-│   │   ├── worker_pool.py
-│   │   └── browser.py
-│   └── main.py           # FastAPI entry point
-├── config/              # YAML configuration
-├── data/                # SQLite DB, sessions, logs
-├── docs/                # Architecture & implementation docs
-└── requirements.txt
+│   ├── main.py              # FastAPI entry
+│   ├── config.py           # Settings
+│   ├── database.py         # SQLAlchemy
+│   ├── logging/            # Logging utilities
+│   │   ├── redact.py       # Sensitive data redaction
+│   │   └── timing.py      # Performance tracking
+│   ├── api/                # Routers
+│   │   ├── accounts.py
+│   │   ├── queue_tasks.py
+│   │   ├── queue_queue.py
+│   │   ├── proxies.py
+│   │   └── admin.py
+│   ├── models/             # DB models
+│   ├── schemas/            # Pydantic schemas
+│   └── modules/
+│       ├── accounts/        # Account service + login
+│       ├── queue/           # QueueProcessor
+│       └── executor/        # Camofox + actions
+├── config/                 # YAML config
+├── data/                    # SQLite + sessions + logs
+├── justfile                # Command runner
+└── pyproject.toml         # Dependencies
 ```
 
 ---
 
-**ReOrchestra** — Your Accounts, In Harmony
+## 📋 Logging
 
-For support, contact: support@reorchestra.io
+Logs are written to `data/logs/app_YYYYMMDD_HHMMSS.log`
+
+- **File:** Always DEBUG level
+- **Console:** INFO level by default, DEBUG when `LOG_LEVEL=DEBUG`
+
+### Sensitive Data
+
+Passwords and proxy credentials are automatically redacted:
+```
+password: "secret123" → password: "****23"
+proxy: "http://user:pass@host:8080" → proxy: "host:8080"
+```
+
+---
+
+## 📚 Docs
+
+- [API Documentation](http://localhost:8000/docs) — Swagger UI
+- `AGENTS.md` — AI-friendly project overview
+- `PRD.md` — Product requirements
+
+---
+
+**ReOrchestra** — *Your Accounts, In Harmony*

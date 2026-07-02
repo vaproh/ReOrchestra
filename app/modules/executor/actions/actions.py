@@ -6,8 +6,11 @@ All actions extend BaseAction and implement find_target_ref + verify_success.
 
 import re
 from typing import Optional
+import logging
 
 from app.modules.executor.actions.base import BaseAction
+
+logger = logging.getLogger("actions")
 
 
 # ============================================================

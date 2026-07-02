@@ -147,6 +147,7 @@ class QueueProcessor:
     # ------------------------------------------------------------------
 
     def start(self):
+        logger.info("QueueProcessor starting")
         if self.is_running():
             return
         self._stop_event.clear()
@@ -155,6 +156,7 @@ class QueueProcessor:
         logger.info("queue | processor_start")
 
     def stop(self, timeout: float = 300):
+        logger.info("QueueProcessor stopped")
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
@@ -178,12 +180,14 @@ class QueueProcessor:
                     if self._stop_event.wait(timeout=2):
                         break
                     continue
+                logger.info(f"Processing task {task.id}: {task.action_type} on {task.target_url}",
+                          extra={"task_id": task.id, "action_type": task.action_type, "target_url": task.target_url})
                 self._process_task(task, db)
                 self._loop_errors = 0
             except Exception as e:
                 self._loop_errors += 1
                 backoff = min(2 ** self._loop_errors, 30)
-                logger.error(f"queue | loop_error | {e}", exc_info=True)
+                logger.error(f"Queue loop error: {e}", extra={"error": str(e)}, exc_info=True)
                 if self._stop_event.wait(timeout=backoff):
                     break
             finally:
@@ -233,11 +237,12 @@ class QueueProcessor:
 
             accounts = self._find_eligible_accounts(task, db, limit=batch_size)
             if not accounts:
-                logger.info(
-                    f"queue | no_eligible_accounts | task_id={task.id} "
-                    f"completed={task.workers_completed}/{task.workers_needed}"
-                )
+                logger.warning(f"No eligible accounts for task {task.id}", extra={"task_id": task.id})
                 break
+
+            for account in accounts:
+                logger.debug(f"Account {account.id} assigned to task {task.id}",
+                           extra={"account_id": account.id, "task_id": task.id})
 
             results = self._execute_batch(task, accounts, db, cancel_event)
 
@@ -354,15 +359,18 @@ class QueueProcessor:
                 return {"success": False, "outcome": "cancelled",
                         "error": "Task cancelled", "attempts": attempt - 1, "duration_ms": 0}
 
-            logger.info(
-                f"queue | attempt | task_id={task.id} "
-                f"account_id={account.id} attempt={attempt}/{self.max_retries}"
-            )
+            logger.debug(f"Attempt {attempt}/{self.max_retries} for account {account.id}",
+                       extra={"account_id": account.id, "attempt": attempt, "max": self.max_retries})
             result = action.execute(account, task.target_url)
             last_result = result
 
             if result.success:
+                logger.info(f"Action success: account {account.id} task {task.id}",
+                          extra={"account_id": account.id, "task_id": task.id})
                 break
+
+            logger.warning(f"Action failed: account {account.id} task {task.id} outcome={result.outcome}",
+                          extra={"account_id": account.id, "task_id": task.id, "outcome": result.outcome})
 
             # Terminal outcomes — stop immediately, no retry
             if result.outcome in DEAD_OUTCOMES or result.outcome in RATE_LIMITED_OUTCOMES:
@@ -371,10 +379,8 @@ class QueueProcessor:
             # Retryable — sleep with exponential backoff
             if attempt < self.max_retries:
                 backoff = min(2 ** attempt, 30)
-                logger.info(
-                    f"queue | retry_backoff | task_id={task.id} "
-                    f"account_id={account.id} backoff={backoff}s outcome={result.outcome}"
-                )
+                logger.debug(f"Retrying account {account.id} in {backoff}s",
+                           extra={"account_id": account.id, "s": backoff})
                 if cancel_event.wait(timeout=backoff):
                     return {"success": False, "outcome": "cancelled",
                             "error": "Task cancelled during backoff",
@@ -424,16 +430,12 @@ class QueueProcessor:
             if outcome in DEAD_OUTCOMES:
                 account.status = AccountStatus.dead
                 account.dead_reason = outcome
-                logger.warning(
-                    f"queue | account_dead | account_id={account_id} "
-                    f"username={account.username} reason={outcome}"
-                )
+                logger.warning(f"Account {account_id} marked dead: {outcome}",
+                             extra={"account_id": account_id, "reason": outcome})
             elif outcome in RATE_LIMITED_OUTCOMES:
                 account.status = AccountStatus.rate_limited
-                logger.info(
-                    f"queue | account_rate_limited | account_id={account_id} "
-                    f"username={account.username}"
-                )
+                logger.info(f"Account {account_id} rate limited",
+                          extra={"account_id": account_id})
             account.last_used = datetime.utcnow()
 
         # Update task counters
@@ -461,8 +463,6 @@ class QueueProcessor:
 
         task.completed_at = datetime.utcnow()
         db.commit()
-        logger.info(
-            f"queue | task_done | task_id={task.id} status={task.status.value} "
-            f"completed={task.workers_completed} failed={task.workers_failed} "
-            f"needed={task.workers_needed}"
-        )
+        logger.info(f"Task {task.id} {task.status.value}: {task.workers_completed} done, {task.workers_failed} failed",
+                  extra={"task_id": task.id, "status": task.status.value,
+                         "completed": task.workers_completed, "failed": task.workers_failed})

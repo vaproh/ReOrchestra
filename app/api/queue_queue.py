@@ -2,10 +2,13 @@
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+import logging
 
 from app.database import get_db, Task, TaskStatus, Account, AccountStatus
 from app.modules.queue import QueueManager
 from app.schemas.common import SuccessResponse
+
+logger = logging.getLogger("queue_api")
 
 router = APIRouter()
 
@@ -43,6 +46,7 @@ async def view_queue(db: Session = Depends(get_db)):
 
 @router.post("/start", response_model=SuccessResponse)
 async def start_queue():
+    logger.info("Queue start requested")
     manager = QueueManager.get()
     manager.start()
     return SuccessResponse(data={"processing": True})
@@ -50,6 +54,7 @@ async def start_queue():
 
 @router.post("/stop", response_model=SuccessResponse)
 async def stop_queue():
+    logger.info("Queue stop requested")
     manager = QueueManager.get()
     manager.stop()
     return SuccessResponse(data={"processing": False})

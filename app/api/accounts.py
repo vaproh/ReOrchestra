@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
 import os
+import logging
 
 from app.database import get_db, Account, AccountStatus, AccountType
+
+logger = logging.getLogger("accounts")
 from app.models import TaskExecutionLog
 from app.schemas.account import (
     AccountResponse,
@@ -34,12 +37,14 @@ async def import_accounts(
     request: BatchImportRequest,
     db: Session = Depends(get_db),
 ):
+    logger.info(f"Importing {len(request.accounts)} accounts")
     imported = []
     errors = []
 
     for acc_data in request.accounts:
         existing = db.query(Account).filter(Account.username == acc_data.username).first()
         if existing:
+            logger.debug(f"Import skip: {acc_data.username} exists")
             errors.append({"username": acc_data.username, "error": "Username already exists"})
             continue
 
@@ -56,6 +61,7 @@ async def import_accounts(
         imported.append(account)
 
     db.commit()
+    logger.info(f"Imported {len(imported)} accounts, {len(errors)} skipped")
 
     return SuccessResponse(data={
         "imported": len(imported),
@@ -168,6 +174,8 @@ async def update_account(
     account.updated_at = datetime.utcnow()
     db.commit()
 
+    logger.info(f"Update account {account_id}: {list(updates.keys())}")
+
     return SuccessResponse(data=AccountResponse.model_validate(account).model_dump())
 
 
@@ -186,6 +194,8 @@ async def delete_account(
 
     db.delete(account)
     db.commit()
+
+    logger.info(f"Delete account {account_id}")
 
     return SuccessResponse(data={"deleted": 1})
 
@@ -214,6 +224,8 @@ async def batch_delete_accounts(
 
     db.commit()
 
+    logger.info(f"Batch delete {len(accounts)}")
+
     return SuccessResponse(data={"deleted": len(accounts)})
 
 
@@ -228,6 +240,7 @@ async def login_accounts(
     if not accounts:
         raise HTTPException(status_code=404, detail="No accounts found")
 
+    logger.info(f"Login {len(accounts)} accounts")
     service = LoginService()
     results = []
 
@@ -245,11 +258,14 @@ async def login_accounts(
                 account.status = AccountStatus.logged_in
                 account.last_login = datetime.utcnow()
                 db.commit()
+                logger.info(f"Login success: {account.username}")
             results.append({"account_id": account.id, "username": account.username, "success": success, "time_ms": time_ms})
         except Exception as e:
+            logger.error(f"Login failed: {account.username} - {e}")
             results.append({"account_id": account.id, "username": account.username, "success": False, "error": str(e)})
 
     succeeded = len([r for r in results if r.get("success")])
+    logger.info(f"Login complete: {succeeded}/{len(accounts)} succeeded")
     return SuccessResponse(data={
         "total": len(accounts),
         "logged_in": succeeded,

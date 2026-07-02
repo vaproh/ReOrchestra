@@ -26,7 +26,7 @@ class ErrorResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    version: str = "1.0.0"
+    version: str = "0.9.0"
 
 
 class StatsAccounts(BaseModel):

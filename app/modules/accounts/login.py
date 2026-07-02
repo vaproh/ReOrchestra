@@ -46,6 +46,7 @@ def _do_login_sync(
 ) -> Tuple[bool, int]:
     client = None
     tab = None
+    start_time = time.time()
 
     try:
         client = CamofoxClient(user_id=user_id, session_key=f"login_{username}")
@@ -56,16 +57,14 @@ def _do_login_sync(
         tab = client.create_tab("https://old.reddit.com/login/")
         client.wait(tab)
 
-        # Step 3: Get snapshot and check if already logged in
         snapshot, _ = client.snapshot_quick(tab)
         if "welcome back" in snapshot.lower() and "already logged in" in snapshot.lower():
             _save_session(username, session_dir, {"username": username, "logged_in": True, "url": "https://www.reddit.com/"})
-            logger.info(f"login | already_logged_in | username={username}")
+            logger.debug(f"Session valid: {username}", extra={"username": username})
             return True, 1000
 
         refs = _find_fields(snapshot)
 
-        # Fill "Email or username" and "Password"
         if "Email or username" in refs:
             client.type_text(tab, refs["Email or username"], username, delay=1)
         if "Password" in refs:
@@ -73,25 +72,23 @@ def _do_login_sync(
 
         _sleep(0.5, 1)
 
-        # Click "Log In"
         login_btn = _find_button(snapshot, "Log In")
         if login_btn:
             client.click(tab, login_btn, delay=8)
 
-        # Step 4: Verify login succeeded
         snapshot, url = client.snapshot_quick(tab)
 
         if "login" not in url.lower():
-            # Login successful
             _save_session(username, session_dir, {"username": username, "logged_in": True, "url": url})
-            logger.info(f"login | success | username={username}")
+            elapsed_ms = int((time.time() - start_time) * 1000)
+            logger.info(f"Login success: {username} ({elapsed_ms}ms)", extra={"username": username, "ms": elapsed_ms})
             return True, 5000
 
-        logger.warning(f"login | failed | username={username} | reason=invalid_credentials")
+        logger.warning(f"Login failed: {username} - invalid_credentials", extra={"username": username, "reason": "invalid_credentials"})
         return False, 0
 
     except Exception as e:
-        logger.error(f"login | error | username={username} | error={e}")
+        logger.error(f"Login error: {username} - {e}", extra={"username": username, "error": str(e)}, exc_info=True)
         return False, 0
 
     finally:
@@ -120,12 +117,13 @@ class LoginService:
     ) -> Tuple[bool, int]:
         session_path = os.path.join(self.session_dir, f"{username}.cookies")
 
+        has_proxy = proxy is not None
         if not force and os.path.exists(session_path):
             if self._validate_session(username):
-                logger.info(f"login | session_valid | username={username}")
+                logger.debug(f"Session valid: {username}", extra={"username": username})
                 return True, 0
 
-        logger.info(f"login | attempting | username={username}")
+        logger.info(f"Login attempt: {username}", extra={"username": username, "has_proxy": has_proxy})
 
         account_id = None
         db = next(get_db())
@@ -158,21 +156,20 @@ class LoginService:
         if not os.path.exists(session_path):
             return False
         try:
-            # Check file age
             from datetime import datetime
             file_age_hours = (datetime.utcnow() - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
             if file_age_hours > get_settings().max_session_age_hours:
-                logger.info(f"login | session_expired | username={username} age_hours={file_age_hours:.1f}")
+                logger.info(f"Session expired: {username} ({file_age_hours:.1f}h)", extra={"username": username, "hours": file_age_hours})
                 return False
 
             with open(session_path, "r") as f:
                 data = json.load(f)
             return data.get("logged_in", False)
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("login | session_file_corrupt | username=%s error=%s", username, e)
+        except (json.JSONDecodeError, OSError):
+            logger.warning(f"Session file corrupt: {username}", extra={"username": username})
             return False
         except Exception as e:
-            logger.error("login | session_validation_error | username=%s error=%s", username, e)
+            logger.error(f"Session validation error: {username} - {e}", extra={"username": username, "error": str(e)}, exc_info=True)
             return False
 
 

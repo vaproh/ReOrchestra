@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
+import logging
 
 from app.database import get_db, Proxy
 from app.schemas.common import SuccessResponse
+
+logger = logging.getLogger("proxies")
 
 router = APIRouter()
 
@@ -89,6 +92,8 @@ async def import_proxies(
 
     db.commit()
 
+    logger.info(f"Importing {imported} proxies")
+
     return SuccessResponse(data={
         "imported": imported,
         "skipped": skipped,
@@ -154,6 +159,8 @@ async def replace_dead_proxies(
 
     remaining_dead = db.query(Proxy).filter(Proxy.status == "dead").count()
 
+    logger.info("Replace dead proxies")
+
     return SuccessResponse(data={
         "replaced": replaced,
         "skipped": skipped,
@@ -173,6 +180,8 @@ async def delete_proxy(
     proxy.assigned_account_id = None
     db.delete(proxy)
     db.commit()
+
+    logger.info(f"Delete proxy {proxy_id}")
 
     return SuccessResponse(data={"deleted": 1})
 
@@ -196,5 +205,7 @@ async def mark_proxy_dead(
     proxy.assigned_account_id = None
 
     db.commit()
+
+    logger.warning(f"Mark proxy dead: {proxy_id}")
 
     return SuccessResponse(data={"success": True})

@@ -32,7 +32,7 @@ class CamofoxClient:
         return f"{self.BASE_URL}{path}"
 
     def create_tab(self, url: str = "about:blank") -> Tab:
-        logger.debug(f"browser | create_tab | url={url}")
+        logger.debug(f"create_tab url={url}", extra={"url": url})
         resp = requests.post(self._url("/tabs"), json={
             "userId": self.user_id,
             "sessionKey": self.session_key,
@@ -40,15 +40,16 @@ class CamofoxClient:
         }, timeout=self._settings.timeout_camofox_tab_create)
         resp.raise_for_status()
         data = resp.json()
-        logger.debug(f"browser | create_tab | tab_id={data['tabId']}")
+        tab_id = data["tabId"]
+        logger.debug(f"create_tab tab_id={tab_id}", extra={"tab_id": tab_id})
         return Tab(
-            tab_id=data["tabId"],
+            tab_id=tab_id,
             user_id=self.user_id,
             session_key=self.session_key,
         )
 
     def navigate(self, tab: Tab, url: str, wait: float = 5.0) -> str:
-        logger.debug(f"browser | navigate | tab_id={tab.tab_id} url={url}")
+        logger.debug(f"navigate tab={tab.tab_id} url={url}", extra={"tab_id": tab.tab_id, "url": url})
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/navigate"),
             json={"userId": tab.user_id, "url": url},
@@ -57,12 +58,11 @@ class CamofoxClient:
         resp.raise_for_status()
         time.sleep(wait)
         result_url = resp.json().get("url", "")
-        logger.debug(f"browser | navigate | tab_id={tab.tab_id} result_url={result_url}")
         return result_url
 
     def wait(self, tab: Tab, timeout: int = 5000, wait_network: bool = True) -> dict:
         """Wait for page readiness via POST /tabs/:tabId/wait."""
-        logger.debug(f"browser | wait | tab_id={tab.tab_id} timeout={timeout}ms")
+        logger.debug(f"wait tab={tab.tab_id} timeout={timeout}ms", extra={"tab_id": tab.tab_id, "timeout": timeout})
         try:
             resp = requests.post(
                 self._url(f"/tabs/{tab.tab_id}/wait"),
@@ -72,10 +72,7 @@ class CamofoxClient:
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
-            logger.warning(
-                f"browser | wait | tab_id={tab.tab_id} error={type(e).__name__}: {e}",
-                exc_info=True,
-            )
+            logger.warning(f"Browser error: {e}", extra={"error": str(e)}, exc_info=True)
             return {"ok": False, "ready": False}
 
     def snapshot_quick(self, tab: Tab) -> tuple[str, str]:
@@ -109,7 +106,7 @@ class CamofoxClient:
         time.sleep(delay)
 
     def click(self, tab: Tab, ref: str, delay: float = 2.0) -> None:
-        logger.debug(f"browser | click | tab_id={tab.tab_id} ref={ref}")
+        logger.debug(f"click tab={tab.tab_id} ref={ref}", extra={"tab_id": tab.tab_id, "ref": ref})
         resp = requests.post(
             self._url(f"/tabs/{tab.tab_id}/click"),
             json={"userId": tab.user_id, "ref": ref},
@@ -129,7 +126,7 @@ class CamofoxClient:
         time.sleep(delay)
 
     def close_tab(self, tab: Tab) -> None:
-        logger.debug(f"browser | close_tab | tab_id={tab.tab_id}")
+        logger.debug(f"close_tab tab={tab.tab_id}", extra={"tab_id": tab.tab_id})
         try:
             requests.delete(
                 self._url(f"/tabs/{tab.tab_id}"),
@@ -137,7 +134,7 @@ class CamofoxClient:
                 timeout=self._settings.timeout_camofox_close,
             )
         except requests.exceptions.RequestException as e:
-            logger.warning("browser | close_tab_failed | tab_id=%s error=%s", tab.tab_id, e)
+            logger.warning(f"Browser error: {e}", extra={"error": str(e)}, exc_info=True)
 
     def health(self) -> dict:
         logger.debug("browser | health_check")

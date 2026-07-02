@@ -3,10 +3,13 @@ import yaml
 from pathlib import Path
 from typing import Any, Optional
 from copy import deepcopy
+import logging
 
 BASE_DIR = Path(__file__).parent.parent.parent
 DEFAULT_CONFIG_PATH = BASE_DIR / "config" / "default.yaml"
 CUSTOM_CONFIG_PATH = BASE_DIR / "config" / "custom.yaml"
+
+logger = logging.getLogger("config")
 
 
 class ConfigService:

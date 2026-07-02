@@ -2,9 +2,12 @@
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
+import logging
 
 from app.database import get_db, Task, TaskStatus, TaskExecutionLog, ACTION_TYPES
 from app.schemas.common import SuccessResponse
+
+logger = logging.getLogger("tasks")
 
 router = APIRouter()
 
@@ -66,6 +69,8 @@ async def create_task(request: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="target_url required")
     if not isinstance(workers_needed, int) or workers_needed < 1:
         raise HTTPException(status_code=400, detail="workers_needed must be a positive integer")
+
+    logger.info(f"Creating task: {action_type} on {target_url} with {workers_needed} workers")
 
     task = Task(
         action_type=action_type,
@@ -145,6 +150,7 @@ async def cancel_task(task_id: int, db: Session = Depends(get_db)):
             evt.set()
 
     db.commit()
+    logger.info(f"Cancel task {task_id}")
     return SuccessResponse(data={"status": task.status.value})
 
 
@@ -156,6 +162,7 @@ async def priority_boost(task_id: int, db: Session = Depends(get_db)):
     task.priority = (task.priority or 0) + 1000
     db.commit()
     db.refresh(task)
+    logger.info(f"Priority boost task {task_id}")
     return SuccessResponse(data={"task_id": task.id, "priority": task.priority})
 
 
