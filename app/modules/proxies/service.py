@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.models import Proxy
-from app.services.config_service import get_config
-from app.services.sticky_proxy import StickyProxyClient
+from app.modules.shared.config import get_config
+from app.modules.proxies.sticky import StickyProxyClient
 
 
 @dataclass

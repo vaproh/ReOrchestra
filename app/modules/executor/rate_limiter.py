@@ -4,8 +4,8 @@ from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models import Account, TaskActionLog, Worker
-from app.services.config_service import get_config
+from app.models import Account, TaskExecutionLog
+from app.modules.shared.config import get_config
 
 
 class RateLimiter:
@@ -48,18 +48,21 @@ class RateLimiter:
         max_vote_ratio = self.config.get("rate_limits", "max_vote_only_ratio", default=0.3)
 
         week_ago = datetime.utcnow() - timedelta(days=7)
-        total_actions = db.query(TaskActionLog).join(Worker).filter(
-            Worker.account_id == account.id,
-            TaskActionLog.created_at >= week_ago,
+        total_actions = db.query(TaskExecutionLog).filter(
+            TaskExecutionLog.account_id == account.id,
+            TaskExecutionLog.created_at >= week_ago,
         ).count()
 
         if total_actions == 0:
             return False
 
-        vote_actions = db.query(TaskActionLog).join(Worker).filter(
-            Worker.account_id == account.id,
-            TaskActionLog.action_type.in_(["upvote_post", "downvote_post", "upvote_comment", "downvote_comment"]),
-            TaskActionLog.created_at >= week_ago,
+        vote_actions = db.query(TaskExecutionLog).filter(
+            TaskExecutionLog.account_id == account.id,
+            TaskExecutionLog.action_type.in_([
+                "upvote_post", "downvote_post",
+                "upvote_comment", "downvote_comment",
+            ]),
+            TaskExecutionLog.created_at >= week_ago,
         ).count()
 
         vote_ratio = vote_actions / total_actions if total_actions > 0 else 0
@@ -83,12 +86,12 @@ class RateLimiter:
     def _should_reset_daily(self, account: Account, now: datetime) -> bool:
         if account.last_vote_at is None:
             return True
-        return (now - account.last_vote_at).days >= 1
+        return (now - account.last_vote_at).total_seconds() >= 86400
 
     def _should_reset_weekly(self, account: Account, now: datetime) -> bool:
         if account.last_vote_at is None:
             return True
-        return (now - account.last_vote_at).days >= 7
+        return (now - account.last_vote_at).total_seconds() >= 604800
 
     def get_stats(self, account: Account) -> dict:
         return {

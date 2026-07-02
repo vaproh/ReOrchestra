@@ -56,29 +56,30 @@ ReOrchestra solves this with:
 | Term | Definition |
 |------|------------|
 | **Account** | Reddit credentials + proxy + status tracking |
-| **Worker** | Queue actor bound to one Account |
 | **Task** | Job: `{action_type, target_url, workers_needed}` |
-| **TaskActionLog** | Per-worker execution result (success, outcome, error, attempts) |
-| **Deduplication** | SHA256 of `{worker_id}:{action_type}:{target_url}` — prevents same worker succeeding same action twice |
+| **TaskExecutionLog** | Per-account execution result (success, outcome, error, attempts) |
+| **Deduplication** | SHA256 of `{account_id}:{action_type}:{target_url}` — prevents same account succeeding same action twice |
 
 ---
 
 ## Architecture
 
 ```
-Request → FastAPI API → QueueProcessor (background thread)
-                              ↓
-                    WorkerPool.assign_workers()
-                              ↓
-                    BaseAction.execute()
-                              ↓
-                    CamofoxClient → Camofox Browser → Reddit
+Request → FastAPI → Task Queue (in-memory + DB persistence)
+                    ↓
+              Task Processor (background loop)
+                    ↓
+              Account Executor (max 3 concurrent)
+                    ↓
+              CamofoxClient → Reddit
 ```
 
 **Queue behavior:**
 - FIFO + priority (`priority DESC, created_at ASC`)
-- Max 3 concurrent workers per task (configurable)
-- 3 retries with exponential backoff (2s, 4s, 8s)
+- Max 3 concurrent accounts per task (configurable)
+- Auto-retry N times (default 3) before marking failed
+- Failed accounts replaced automatically
+- Deduplication by `{account_id}:{action_type}:{target_url}`
 - Vote actions: click first, check popup AFTER (popup only appears after click)
 - Non-vote actions: check header banner BEFORE clicking (banner shows before action)
 
@@ -262,12 +263,14 @@ r'link\s+"join"\s+\[e(\d+)\]'
 
 ## Current TODO (Priority Order)
 
-1. **1.1** Fix Login Proxy Injection — proxies not passed to Camofox
-2. **1.3** Parallel Worker Execution — workers run sequentially now
-3. **1.2** Fix DB Session Lifecycle — QueueProcessor session management
-4. **2.1** Integrate RateLimiter into Queue Loop — exists but unused
-5. **3.1** Dead Letter Queue — failed tasks vanish
-6. **4.1** Dashboard improvements — better UX for 500+ accounts
+1. ~~**1.1** Fix Login Proxy Injection — verified working, proxies passed to Camofox~~ (done)
+2. ~~**1.2** Fix DB Session Lifecycle — QueueProcessor session management~~ (done)
+3. ~~**1.3** Parallel Worker Execution — verified working with ThreadPoolExecutor~~ (done)
+4. ~~**2.1** Integrate RateLimiter into Queue Loop — verified integrated~~ (done)
+5. **2.2** Session Health Monitoring — proactive session refresh
+6. **3.3** Cancellation Tokens — stop in-flight work on cancel
+7. **4.1** Dashboard improvements — better UX for 500+ accounts
+8. **4.2** Health Check Endpoint — DB/disk/Camofox monitoring
 
 Full list: `TODO.md`
 
@@ -290,4 +293,6 @@ Full list: `TODO.md`
 - **Session persistence**: Handled by Camofox persistence plugin — cookies survive restarts
 - **Proxy per session**: Via sticky-proxy plugin, assigned via `POST /users/{userId}/proxy`
 - **Database path**: SQLite at `data/reddit.db`
-- **RateLimiter not integrated**: Class exists but queue doesn't call it yet
+- **RateLimiter integrated**: `check()` called before vote actions, `record_vote()` after success
+- **CORS configurable**: Set `CORS_ALLOWED_ORIGINS` in `.env` (comma-separated); credentials disabled when wildcard
+- **WorkerPool thread-safe**: All state-modifying methods use `threading.Lock()`

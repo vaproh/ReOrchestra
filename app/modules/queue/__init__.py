@@ -1,8 +1,8 @@
 """
-Queue manager singleton.
+Queue module — exposes QueueManager singleton.
 
-Holds a single QueueProcessor instance driving the background loop with
-its own long-lived DB session. API endpoints call into this manager.
+Usage:
+    from app.modules.queue import QueueManager
 """
 
 import logging
@@ -10,8 +10,8 @@ import threading
 from typing import Optional
 
 from app.models import SessionLocal
-from app.services.browser import CamofoxClient
-from app.services.queue_processor import QueueProcessor
+from app.modules.executor.browser import CamofoxClient
+from app.modules.queue.processor import QueueProcessor
 
 logger = logging.getLogger("queue_manager")
 
@@ -52,3 +52,11 @@ class QueueManager:
     def is_running(self) -> bool:
         with self._lock:
             return self._processor is not None and self._processor.is_running()
+
+    @property
+    def processor(self) -> Optional[QueueProcessor]:
+        """Direct access to the processor for API endpoints that need it."""
+        return self._processor
+
+
+__all__ = ["QueueManager", "QueueProcessor"]

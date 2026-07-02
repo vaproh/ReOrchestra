@@ -1,19 +1,16 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-import logging
 from datetime import datetime
 
 from app.config import get_settings
 from app.database import init_db
 from app.api.router import router
+from app.logging_config import setup_logging, get_logger
 
-logging.basicConfig(
-    level=getattr(logging, get_settings().log_level),
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-)
-logger = logging.getLogger("api")
+setup_logging()
+logger = get_logger("api")
 
 
 @asynccontextmanager
@@ -22,7 +19,7 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
     yield
     # Graceful shutdown
-    from app.services.queue_manager import QueueManager
+    from app.modules.queue import QueueManager
     QueueManager.get().stop()
     logger.info("Shutting down")
 
@@ -33,13 +30,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.cors_origins,
+    allow_credentials=settings.cors_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": f"HTTP_{exc.status_code}",
+                "message": exc.detail,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            }
+        },
+    )
 
 
 @app.exception_handler(Exception)
@@ -63,6 +75,7 @@ from app.gui import router as gui_router
 app.include_router(gui_router, prefix="/gui")
 
 
-@app.get("/")
-async def root():
-    return {"message": "ReOrchestra API", "version": "1.0.0", "docs": "/docs", "gui": "/gui"}
+from fastapi.staticfiles import StaticFiles
+
+# Mount the frontend directory to serve the dashboard on the root path
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

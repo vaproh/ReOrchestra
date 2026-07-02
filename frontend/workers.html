@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workers — ReOrchestra</title>
+  <meta name="description" content="Monitor and control the Reddit automation worker pool in ReOrchestra.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            canvas:'#010102',surface:{1:'#0f1011',2:'#141516',3:'#18191a'},
+            hairline:'#23252a','hairline-strong':'#34343a',
+            ink:'#f7f8f8','ink-muted':'#d0d6e0','ink-subtle':'#8a8f98',
+            accent:'#ff4500','accent-hover':'#ff5722',
+            success:'#27a644',warning:'#ffc107',error:'#f85149',info:'#58a6ff',
+          },
+          fontFamily:{sans:['Inter','-apple-system','sans-serif'],mono:['JetBrains Mono','monospace']}
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body class="bg-canvas text-ink font-sans antialiased">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="w-56 bg-surface-1 border-r border-hairline flex flex-col shrink-0">
+    <div class="h-14 flex items-center px-4 border-b border-hairline gap-3 shrink-0">
+      <div class="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>
+      </div>
+      <div>
+        <div class="text-sm font-semibold tracking-tight text-ink leading-tight">ReOrchestra</div>
+        <div class="text-xs" style="color:var(--ink-subtle)">Account Manager</div>
+      </div>
+    </div>
+    <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
+      <a href="/" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</a>
+      <a href="/accounts" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Accounts</a>
+      <a href="/workers" class="nav-link active" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Workers</a>
+      <a href="/tasks" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Tasks</a>
+      <a href="/dead-letter" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Dead Letter</a>
+      <a href="/queue" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="5 3 19 12 5 21 5 3"/></svg>Queue</a>
+      <a href="/proxies" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Proxies</a>
+      <div class="my-2" style="height:1px;background:var(--hairline)"></div>
+      <a href="/settings" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+    </nav>
+    <div class="p-3 border-t border-hairline shrink-0"><div class="text-xs" style="color:var(--ink-tertiary)">ReOrchestra v1.0.0</div></div>
+  </aside>
+  <div id="sidebar-overlay"></div>
+
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="h-14 bg-surface-1 border-b border-hairline flex items-center justify-between px-6 shrink-0">
+      <div class="flex items-center gap-3">
+        <button id="sidebar-toggle" class="md:hidden btn btn-icon btn-ghost" aria-label="Toggle menu">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="text-sm font-semibold">Workers</h1>
+        <span class="text-xs px-2 py-0.5 rounded-full" style="background:var(--surface-2);color:var(--ink-subtle)">Auto-refresh 5s</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button class="btn btn-primary btn-sm" id="create-workers-btn" onclick="showCreateWorkersModal()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Workers
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="ReOrchestra.loadWorkers()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-auto p-6 space-y-6">
+
+      <!-- Stats Summary -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="stat-card">
+          <div class="stat-label">Total Workers</div>
+          <div class="stat-value" id="w-total">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label" style="color:#4ade80">Active</div>
+          <div class="stat-value" style="color:#4ade80" id="w-active">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label" style="color:#fbbf24">Paused</div>
+          <div class="stat-value" style="color:#fbbf24" id="w-paused">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label" style="color:#f87171">Suspended</div>
+          <div class="stat-value" style="color:#f87171" id="w-suspended">—</div>
+        </div>
+      </div>
+
+      <!-- Workers Table -->
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-hairline">
+          <div class="section-title">Worker Pool</div>
+          <div class="flex items-center gap-2">
+            <span class="status-dot running"></span>
+            <span class="text-xs" style="color:var(--ink-subtle)">Live</span>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:72px">Worker</th>
+              <th>Account</th>
+              <th style="width:100px">Status</th>
+              <th>Current Task</th>
+              <th style="width:110px">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="workers-tbody">
+            <tr class="loading-row"><td colspan="5"><div class="empty-state"><div class="spinner"></div><p>Loading workers…</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Create Workers Modal -->
+<div id="create-workers-modal" style="display:none" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+    <div class="flex items-center justify-between mb-5">
+      <h2 id="modal-title" class="font-semibold">Add Workers from Accounts</h2>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">✕</button>
+    </div>
+    <p class="text-sm mb-4" style="color:var(--ink-subtle)">Creates worker instances from existing accounts. Workers without proxies will use system-level rotation.</p>
+    <form hx-post="/api/workers/bulk"
+          hx-target="#modal-result"
+          hx-swap="innerHTML"
+          class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Account IDs (comma-separated)</label>
+        <textarea name="account_ids" class="form-input font-mono text-xs" rows="3"
+                  placeholder="1, 2, 3, 4, 5 (or leave blank for all unassigned accounts)"></textarea>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="btn btn-primary">Create Workers</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      </div>
+    </form>
+    <div id="modal-result" class="mt-3"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+<script src="/js/app.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    ReOrchestra.initSidebar();
+    ReOrchestra.loadWorkers();
+
+    // Poll every 5 seconds
+    ReOrchestra.startPolling(async () => {
+      const workers = await fetch('/api/workers').then(r => r.ok ? r.json() : null).catch(() => null);
+      if (!workers) return;
+      // Update stats
+      const total = workers.length;
+      const active = workers.filter(w => w.status === 'active').length;
+      const paused = workers.filter(w => w.status === 'paused').length;
+      const suspended = workers.filter(w => w.status === 'suspended').length;
+      document.getElementById('w-total')?.textContent !== undefined && (document.getElementById('w-total').textContent = total);
+      document.getElementById('w-active') && (document.getElementById('w-active').textContent = active);
+      document.getElementById('w-paused') && (document.getElementById('w-paused').textContent = paused);
+      document.getElementById('w-suspended') && (document.getElementById('w-suspended').textContent = suspended);
+      ReOrchestra.loadWorkers();
+    }, 5000);
+  });
+
+  function showCreateWorkersModal() {
+    document.getElementById('create-workers-modal').style.display = 'flex';
+  }
+  function closeModal() {
+    document.getElementById('create-workers-modal').style.display = 'none';
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+</script>
+</body>
+</html>

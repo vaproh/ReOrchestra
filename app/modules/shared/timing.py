@@ -2,7 +2,7 @@ import math
 import random
 from typing import Optional
 
-from app.services.config_service import get_config
+from app.modules.shared.config import get_config
 
 
 class TimingService:

@@ -73,7 +73,10 @@ class CamofoxClient:
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
-            logger.warning(f"browser | wait | tab_id={tab.tab_id} error={e}")
+            logger.warning(
+                f"browser | wait | tab_id={tab.tab_id} error={type(e).__name__}: {e}",
+                exc_info=True,
+            )
             return {"ok": False, "ready": False}
 
     def snapshot_quick(self, tab: Tab) -> tuple[str, str]:

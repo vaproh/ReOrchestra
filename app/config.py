@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # ===== LOGGING =====
     log_level: str = "INFO"
 
+    # ===== CORS =====
+    cors_allowed_origins: str = "*"
+
     # ===== CAPTCHA =====
     capsolver_api_key: str | None = None
     twocaptcha_api_key: str | None = None
@@ -64,6 +67,13 @@ class Settings(BaseSettings):
             return self.camofox_dir
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(project_root, self.camofox_dir)
+
+    @property
+    def cors_origins(self) -> list[str]:
+        if not self.cors_allowed_origins:
+            return ["*"]
+        origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+        return origins if origins else ["*"]
 
     class Config:
         env_file = ".env"

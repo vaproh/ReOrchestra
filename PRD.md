@@ -116,6 +116,50 @@
 
 ---
 
+## 5.5 Queue System Design
+
+### Core Queue Behaviors
+
+The system operates as a simplified task-based queue:
+1. **Task Creation**: Create task specifying action, target URL, and total workers needed: `{ action: "upvote_post", url: "...", workers_needed: 100 }`.
+2. **Account Selection**: Select idle, active accounts that have not already successfully executed this action on this target.
+3. **Concurrent Execution**: Run task actions concurrently, constrained by a configuration limit (default max 3 concurrent executions).
+4. **Auto-Replacement on Ban/Suspend**: If an account fails due to being banned or suspended, mark it dead/banned, and dynamically assign a new idle account to replace it.
+5. **Success Handling**: Mark account action as completed and update task counts on success.
+6. **Retry with Backoff**: For retryable errors (like click timeout or element not found), retry up to $N$ times (default 3) before marking the attempt as failed.
+7. **Execution Termination**: Continue processing until the requested `workers_needed` count is satisfied, or no more eligible accounts are left.
+8. **Task Completion Tracking**: Track final execution status (completed, partial, or failed).
+
+### Error Handling
+
+| Error Outcome / Code | Action Taken |
+|----------------------|--------------|
+| `popup_suspended` | Mark account `dead`, assign new account to replace |
+| `popup_rate_limited` | Mark account `rate_limited`, assign new account to replace |
+| `header_banned` | Mark account `dead`, assign new account to replace |
+| `header_suspended` | Mark account `dead`, assign new account to replace |
+| `click_timeout` | Retry up to N times (default 3) before failure |
+| `element_not_found` | Retry up to N times (default 3) before failure |
+
+### Account Status Flow
+
+```mermaid
+graph TD
+    fresh[fresh] --> logged_in[logged_in]
+    logged_in --> session_expired[session_expired]
+    logged_in --> rate_limited[rate_limited]
+    rate_limited -->|After Cooldown| logged_in
+    logged_in --> dead[banned / dead]
+    session_expired --> dead
+```
+
+### Task States
+
+Tasks transition through the following states:
+`queued` ➔ `running` ➔ `completed` | `partial` | `failed` | `cancelled`
+
+---
+
 ## 6. User Workflow
 
 ```

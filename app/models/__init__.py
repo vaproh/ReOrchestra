@@ -14,6 +14,7 @@ class AccountStatus(str, enum.Enum):
     fresh = "fresh"
     logged_in = "logged_in"
     session_expired = "session_expired"
+    rate_limited = "rate_limited"
     banned = "banned"
     dead = "dead"
 
@@ -186,14 +187,8 @@ class Config(Base):
 
 
 # ============================================================
-# Worker Queue System Models
+# Queue System Models (task-based, accounts are the workers)
 # ============================================================
-
-
-class WorkerStatus(str, enum.Enum):
-    idle = "idle"
-    working = "working"
-    paused = "paused"
 
 
 class TaskStatus(str, enum.Enum):
@@ -203,15 +198,6 @@ class TaskStatus(str, enum.Enum):
     partial = "partial"
     failed = "failed"
     cancelled = "cancelled"
-    dead_letter = "dead_letter"
-
-
-class ActionOutcome(str, enum.Enum):
-    success = "success"
-    failed = "failed"
-    duplicate = "duplicate"
-    popup_suspended = "popup_suspended"
-    popup_rate_limited = "popup_rate_limited"
 
 
 # Supported Reddit action types
@@ -228,26 +214,6 @@ ACTION_TYPES = [
 ]
 
 
-class Worker(Base):
-    __tablename__ = "queue_workers"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    username = Column(String(20), nullable=False)
-
-    status = Column(SQLEnum(WorkerStatus), default=WorkerStatus.idle)
-    current_task_id = Column(Integer, nullable=True)
-
-    total_actions = Column(Integer, default=0)
-    failed_actions = Column(Integer, default=0)
-    last_action_at = Column(DateTime, nullable=True)
-
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    account = relationship("Account")
-
-
 class Task(Base):
     __tablename__ = "queue_tasks"
 
@@ -256,49 +222,53 @@ class Task(Base):
     target_url = Column(Text, nullable=False)
 
     workers_needed = Column(Integer, nullable=False, default=1)
-    workers_assigned = Column(Text, default="[]")          # JSON list of worker ids
-    failed_workers = Column(Text, default="[]")             # JSON list of worker ids
-    workers_completed = Column(Integer, default=0)
+    workers_completed = Column(Integer, default=0)   # successful executions
+    workers_failed = Column(Integer, default=0)      # failed/replaced executions
 
     status = Column(SQLEnum(TaskStatus), default=TaskStatus.queued)
-    priority = Column(Integer, default=0)                  # higher = sooner
+    priority = Column(Integer, default=0)            # higher = sooner
 
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Dead Letter Queue fields
-    retry_count = Column(Integer, default=0)
-    max_retries = Column(Integer, default=3)
-    dlq_reason = Column(String(128), nullable=True)
-    dlq_at = Column(DateTime, nullable=True)
-    last_error = Column(Text, nullable=True)
-
-    logs = relationship("TaskActionLog", back_populates="task", order_by="TaskActionLog.created_at")
+    logs = relationship("TaskExecutionLog", back_populates="task", order_by="TaskExecutionLog.created_at")
 
 
-class TaskActionLog(Base):
-    __tablename__ = "queue_action_log"
+class TaskExecutionLog(Base):
+    """Per-account execution record for a task.
+
+    Replaces the old TaskActionLog/Worker-based model.
+    Deduplication key: account_id + action_type + target_url.
+    """
+    __tablename__ = "queue_execution_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(Integer, ForeignKey("queue_tasks.id"), nullable=False)
-    worker_id = Column(Integer, ForeignKey("queue_workers.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
 
     action_type = Column(String(32), nullable=False)
     target_url = Column(Text, nullable=False)
 
     success = Column(Boolean, default=False)
-    outcome = Column(String(32), default=ActionOutcome.failed.value)
+    # outcome codes: success | popup_suspended | popup_rate_limited |
+    #                header_banned | header_suspended | click_timeout |
+    #                element_not_found | failed | cancelled
+    outcome = Column(String(32), nullable=False, default="failed")
     error = Column(Text, nullable=True)
     attempts = Column(Integer, default=1)
     duration_ms = Column(Integer, nullable=True)
 
-    dedup_hash = Column(String(64), nullable=False)
+    # SHA-256[:16] of "{account_id}:{action_type}:{target_url}"
+    # Unique constraint prevents the same account from succeeding the same
+    # action on the same target twice.
+    dedup_hash = Column(String(64), nullable=False, index=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     task = relationship("Task", back_populates="logs")
-    worker = relationship("Worker")
+    account = relationship("Account")
 
 
 _settings = get_settings()

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — ReOrchestra</title>
+  <meta name="description" content="Configure rate limits, queue settings, and Camofox connection for ReOrchestra.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            canvas:'#010102',surface:{1:'#0f1011',2:'#141516',3:'#18191a'},
+            hairline:'#23252a','hairline-strong':'#34343a',
+            ink:'#f7f8f8','ink-muted':'#d0d6e0','ink-subtle':'#8a8f98',
+            accent:'#ff4500','accent-hover':'#ff5722',
+            success:'#27a644',warning:'#ffc107',error:'#f85149',info:'#58a6ff',
+          },
+          fontFamily:{sans:['Inter','-apple-system','sans-serif'],mono:['JetBrains Mono','monospace']}
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body class="bg-canvas text-ink font-sans antialiased">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="w-56 bg-surface-1 border-r border-hairline flex flex-col shrink-0">
+    <div class="h-14 flex items-center px-4 border-b border-hairline gap-3 shrink-0">
+      <div class="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>
+      </div>
+      <div>
+        <div class="text-sm font-semibold tracking-tight text-ink leading-tight">ReOrchestra</div>
+        <div class="text-xs" style="color:var(--ink-subtle)">Account Manager</div>
+      </div>
+    </div>
+    <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto">
+      <a href="/" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</a>
+      <a href="/accounts" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Accounts</a>
+      <a href="/workers" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Workers</a>
+      <a href="/tasks" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Tasks</a>
+      <a href="/dead-letter" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Dead Letter</a>
+      <a href="/queue" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="5 3 19 12 5 21 5 3"/></svg>Queue</a>
+      <a href="/proxies" class="nav-link"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Proxies</a>
+      <div class="my-2" style="height:1px;background:var(--hairline)"></div>
+      <a href="/settings" class="nav-link active" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+    </nav>
+    <div class="p-3 border-t border-hairline shrink-0"><div class="text-xs" style="color:var(--ink-tertiary)">ReOrchestra v1.0.0</div></div>
+  </aside>
+  <div id="sidebar-overlay"></div>
+
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="h-14 bg-surface-1 border-b border-hairline flex items-center justify-between px-6 shrink-0">
+      <div class="flex items-center gap-3">
+        <button id="sidebar-toggle" class="md:hidden btn btn-icon btn-ghost" aria-label="Toggle menu">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="text-sm font-semibold">Settings</h1>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-auto p-6">
+      <div class="max-w-2xl mx-auto space-y-6">
+
+        <!-- Rate Limiting -->
+        <div class="card p-5">
+          <h2 class="font-semibold text-sm mb-1 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Rate Limiting
+          </h2>
+          <p class="text-xs mb-5" style="color:var(--ink-subtle)">Per-account vote limits to avoid Reddit detection. Applies to all voting actions.</p>
+          <form id="rate-limit-form" hx-post="/api/settings/rate-limits" hx-target="#rate-limit-result" hx-swap="innerHTML" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label for="max-daily-votes" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Max Votes / Day</label>
+                <input type="number" id="max-daily-votes" name="max_votes_per_day"
+                       class="form-input" value="15" min="1" max="50">
+                <p class="text-xs mt-1" style="color:var(--ink-subtle)">Recommended: ≤15 per day</p>
+              </div>
+              <div>
+                <label for="max-weekly-votes" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Max Votes / Week</label>
+                <input type="number" id="max-weekly-votes" name="max_votes_per_week"
+                       class="form-input" value="100" min="1" max="500">
+                <p class="text-xs mt-1" style="color:var(--ink-subtle)">Recommended: ≤100 per week</p>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Action Timing Jitter</label>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label for="min-jitter" class="text-xs mb-1 block" style="color:var(--ink-muted)">Min delay (seconds)</label>
+                  <input type="number" id="min-jitter" name="min_jitter_seconds"
+                         class="form-input" value="5" min="1" max="30">
+                </div>
+                <div>
+                  <label for="max-jitter" class="text-xs mb-1 block" style="color:var(--ink-muted)">Max delay (seconds)</label>
+                  <input type="number" id="max-jitter" name="max_jitter_seconds"
+                         class="form-input" value="7" min="1" max="60">
+                </div>
+              </div>
+              <p class="text-xs mt-1" style="color:var(--ink-subtle)">S-curve timing with jitter between page load and action click.</p>
+            </div>
+
+            <div class="pt-2 flex items-center gap-3">
+              <button type="submit" class="btn btn-primary">Save Rate Limits</button>
+              <div id="rate-limit-result"></div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Queue Settings -->
+        <div class="card p-5">
+          <h2 class="font-semibold text-sm mb-1 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Queue Settings
+          </h2>
+          <p class="text-xs mb-5" style="color:var(--ink-subtle)">Controls the FIFO task processor behavior. Changes take effect after restarting the queue.</p>
+          <form id="queue-settings-form" hx-post="/api/settings/queue" hx-target="#queue-settings-result" hx-swap="innerHTML" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label for="max-concurrent" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Max Concurrent Workers / Task</label>
+                <input type="number" id="max-concurrent" name="max_concurrent_workers"
+                       class="form-input" value="3" min="1" max="10">
+              </div>
+              <div>
+                <label for="max-retries" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Max Retry Attempts</label>
+                <input type="number" id="max-retries" name="max_retry_attempts"
+                       class="form-input" value="3" min="1" max="10">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Retry Backoff Seconds (comma-separated)</label>
+              <input type="text" name="retry_backoff"
+                     class="form-input font-mono"
+                     value="2, 4, 8"
+                     placeholder="2, 4, 8">
+              <p class="text-xs mt-1" style="color:var(--ink-subtle)">Wait times between retries. Must match max retry count.</p>
+            </div>
+
+            <div class="pt-2 flex items-center gap-3">
+              <button type="submit" class="btn btn-primary">Save Queue Settings</button>
+              <div id="queue-settings-result"></div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Camofox Connection -->
+        <div class="card p-5">
+          <h2 class="font-semibold text-sm mb-1 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Camofox Browser
+          </h2>
+          <p class="text-xs mb-5" style="color:var(--ink-subtle)">Headless Firefox with C++-level anti-detection. Runs as a separate process.</p>
+          <form id="camofox-form" hx-post="/api/settings/camofox" hx-target="#camofox-result" hx-swap="innerHTML" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label for="camofox-host" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Host</label>
+                <input type="text" id="camofox-host" name="camofox_host"
+                       class="form-input font-mono" value="localhost">
+              </div>
+              <div>
+                <label for="camofox-port" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Port</label>
+                <input type="number" id="camofox-port" name="camofox_port"
+                       class="form-input font-mono" value="9377">
+              </div>
+            </div>
+
+            <div>
+              <label for="click-timeout" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Click Timeout (seconds)</label>
+              <input type="number" id="click-timeout" name="click_timeout_seconds"
+                     class="form-input" value="60" min="10" max="120">
+              <p class="text-xs mt-1" style="color:var(--ink-subtle)">Time to wait for a button click. Suspended accounts may take the full 60s.</p>
+            </div>
+
+            <div class="pt-2 flex items-center gap-3">
+              <button type="submit" class="btn btn-primary">Save Camofox Settings</button>
+              <button type="button" class="btn btn-secondary" onclick="testCamofox()">Test Connection</button>
+              <div id="camofox-result"></div>
+            </div>
+          </form>
+        </div>
+
+        <!-- CORS Settings -->
+        <div class="card p-5">
+          <h2 class="font-semibold text-sm mb-1 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            CORS & API Access
+          </h2>
+          <p class="text-xs mb-5" style="color:var(--ink-subtle)">Control which origins can call the API. Use <code class="code-pill">*</code> for wildcard (disables credentials).</p>
+          <form id="cors-form" hx-post="/api/settings/cors" hx-target="#cors-result" hx-swap="innerHTML" class="space-y-4">
+            <div>
+              <label for="cors-origins" class="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style="color:var(--ink-subtle)">Allowed Origins</label>
+              <textarea id="cors-origins" name="cors_origins"
+                        class="form-input font-mono text-xs"
+                        rows="3"
+                        placeholder="http://localhost:3000&#10;https://yourdomain.com">http://localhost:8080</textarea>
+              <p class="text-xs mt-1" style="color:var(--ink-subtle)">One origin per line. Comma-separated also accepted.</p>
+            </div>
+            <div class="pt-2 flex items-center gap-3">
+              <button type="submit" class="btn btn-primary">Save CORS Settings</button>
+              <div id="cors-result"></div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card p-5" style="border-color:rgba(248,81,73,0.3)">
+          <h2 class="font-semibold text-sm mb-1 flex items-center gap-2" style="color:var(--error)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Danger Zone
+          </h2>
+          <p class="text-xs mb-4" style="color:var(--ink-subtle)">Irreversible actions. Use with caution.</p>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between py-3 border-b border-hairline">
+              <div>
+                <div class="text-sm font-medium">Reset All Vote Counts</div>
+                <div class="text-xs" style="color:var(--ink-subtle)">Clears daily and weekly vote tallies for all accounts</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" style="border-color:var(--error);color:var(--error)"
+                      onclick="if(confirm('Reset all vote counts?')) fetch('/api/admin/reset-votes',{method:'POST'}).then(()=>ReOrchestra.showToast('Vote counts reset','success'))">
+                Reset Counts
+              </button>
+            </div>
+            <div class="flex items-center justify-between py-3 border-b border-hairline">
+              <div>
+                <div class="text-sm font-medium">Clear All Tasks</div>
+                <div class="text-xs" style="color:var(--ink-subtle)">Deletes all tasks from the database (cannot be undone)</div>
+              </div>
+              <button class="btn btn-danger btn-sm"
+                      hx-delete="/api/tasks/all"
+                      hx-confirm="Delete ALL tasks? This cannot be undone.">
+                Delete All Tasks
+              </button>
+            </div>
+            <div class="flex items-center justify-between py-3">
+              <div>
+                <div class="text-sm font-medium">Stop Queue &amp; Clear Workers</div>
+                <div class="text-xs" style="color:var(--ink-subtle)">Gracefully stops the processor and releases all worker locks</div>
+              </div>
+              <button class="btn btn-danger btn-sm"
+                      onclick="if(confirm('Stop queue and release all workers?')) fetch('/api/queue/emergency-stop',{method:'POST'}).then(()=>ReOrchestra.showToast('Emergency stop triggered','warning'))">
+                Emergency Stop
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
+<script src="/js/app.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    ReOrchestra.initSidebar();
+    loadCurrentSettings();
+  });
+
+  async function loadCurrentSettings() {
+    const settings = await fetch('/api/settings').then(r => r.ok ? r.json() : null).catch(() => null);
+    if (!settings) return;
+    // Populate form fields with current values
+    if (settings.max_votes_per_day) document.getElementById('max-daily-votes').value = settings.max_votes_per_day;
+    if (settings.max_votes_per_week) document.getElementById('max-weekly-votes').value = settings.max_votes_per_week;
+    if (settings.max_concurrent_workers) document.getElementById('max-concurrent').value = settings.max_concurrent_workers;
+    if (settings.max_retry_attempts) document.getElementById('max-retries').value = settings.max_retry_attempts;
+    if (settings.camofox_host) document.getElementById('camofox-host').value = settings.camofox_host;
+    if (settings.camofox_port) document.getElementById('camofox-port').value = settings.camofox_port;
+    if (settings.click_timeout_seconds) document.getElementById('click-timeout').value = settings.click_timeout_seconds;
+  }
+
+  async function testCamofox() {
+    ReOrchestra.showToast('Testing Camofox connection…', 'info');
+    const res = await fetch('/api/admin/health').then(r => r.ok ? r.json() : null).catch(() => null);
+    if (res && (res.camofox === 'ok' || res.camofox === true)) {
+      ReOrchestra.showToast('Camofox connected successfully!', 'success');
+    } else {
+      ReOrchestra.showToast('Camofox connection failed. Is it running on port 9377?', 'error');
+    }
+  }
+</script>
+</body>
+</html>

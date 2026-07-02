@@ -1,33 +1,30 @@
 """Task API endpoints for the queue system."""
 
-import json
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import get_db, Task, TaskStatus, TaskActionLog, ACTION_TYPES
+from app.database import get_db, Task, TaskStatus, TaskExecutionLog, ACTION_TYPES
 from app.schemas.common import SuccessResponse
 
 router = APIRouter()
 
 
 def _task_dict(t: Task) -> dict:
-    assigned = json.loads(t.workers_assigned or "[]")
-    failed = json.loads(t.failed_workers or "[]")
     completed = t.workers_completed or 0
+    failed = t.workers_failed or 0
     return {
         "id": t.id,
         "action_type": t.action_type,
         "target_url": t.target_url,
         "workers_needed": t.workers_needed,
-        "workers_assigned": assigned,
-        "failed_workers": failed,
         "workers_completed": completed,
+        "workers_failed": failed,
         "status": t.status.value if t.status else None,
         "priority": t.priority,
         "progress": {
             "total": t.workers_needed,
             "completed": completed,
-            "failed": len(failed),
+            "failed": failed,
             "remaining": max(0, t.workers_needed - completed),
         },
         "created_at": t.created_at.isoformat() if t.created_at else None,
@@ -43,7 +40,10 @@ async def list_tasks(
 ):
     q = db.query(Task)
     if status:
-        q = q.filter(Task.status == TaskStatus(status))
+        try:
+            q = q.filter(Task.status == TaskStatus(status))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in TaskStatus]}")
     tasks = q.order_by(Task.created_at.desc()).limit(100).all()
     return SuccessResponse(data={
         "total": len(tasks),
@@ -56,19 +56,22 @@ async def create_task(request: dict, db: Session = Depends(get_db)):
     action_type = request.get("action_type")
     target_url = request.get("target_url")
     workers_needed = request.get("workers_needed", 1)
+    priority = request.get("priority", 0)
 
     if not action_type:
-        raise HTTPException(400, "action_type required")
+        raise HTTPException(status_code=400, detail="action_type required")
     if action_type not in ACTION_TYPES:
-        raise HTTPException(400, f"Invalid action_type. Valid: {ACTION_TYPES}")
+        raise HTTPException(status_code=400, detail=f"Invalid action_type. Valid: {ACTION_TYPES}")
     if not target_url:
-        raise HTTPException(400, "target_url required")
+        raise HTTPException(status_code=400, detail="target_url required")
+    if not isinstance(workers_needed, int) or workers_needed < 1:
+        raise HTTPException(status_code=400, detail="workers_needed must be a positive integer")
 
-    # quick flush then count queue position
     task = Task(
         action_type=action_type,
         target_url=target_url,
         workers_needed=workers_needed,
+        priority=priority,
         status=TaskStatus.queued,
     )
     db.add(task)
@@ -95,92 +98,85 @@ async def get_task(task_id: int, db: Session = Depends(get_db)):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     data = _task_dict(task)
+
     logs = (
-        db.query(TaskActionLog)
-        .filter(TaskActionLog.task_id == task_id)
-        .order_by(TaskActionLog.created_at.desc())
+        db.query(TaskExecutionLog)
+        .filter(TaskExecutionLog.task_id == task_id)
+        .order_by(TaskExecutionLog.created_at.desc())
         .limit(50)
         .all()
     )
     data["logs"] = [
         {
-            "id": l.id,
-            "worker_id": l.worker_id,
-            "success": l.success,
-            "outcome": l.outcome,
-            "error": l.error,
-            "attempts": l.attempts,
-            "duration_ms": l.duration_ms,
-            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "id": log.id,
+            "account_id": log.account_id,
+            "success": log.success,
+            "outcome": log.outcome,
+            "error": log.error,
+            "attempts": log.attempts,
+            "duration_ms": log.duration_ms,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
         }
-        for l in logs
+        for log in logs
     ]
     return SuccessResponse(data=data)
 
 
 @router.post("/{task_id}/cancel", response_model=SuccessResponse)
 async def cancel_task(task_id: int, db: Session = Depends(get_db)):
-    from app.services.queue_processor import QueueProcessor
-    qp = QueueProcessor(db)
-    try:
-        task = qp.cancel_task(task_id)
-    except ValueError:
+    from app.modules.queue import QueueManager
+    manager = QueueManager.get()
+    processor = manager.processor
+
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status in (TaskStatus.completed, TaskStatus.cancelled):
+        return SuccessResponse(data={"status": task.status.value, "message": "Task already finished"})
+
+    task.status = TaskStatus.cancelled
+    task.completed_at = __import__("datetime").datetime.utcnow()
+
+    # Signal the running processor thread if active
+    if processor:
+        evt = processor._cancel_events.get(task_id)
+        if evt:
+            evt.set()
+
+    db.commit()
     return SuccessResponse(data={"status": task.status.value})
 
 
 @router.post("/{task_id}/priority", response_model=SuccessResponse)
 async def priority_boost(task_id: int, db: Session = Depends(get_db)):
-    from app.services.queue_processor import QueueProcessor
-    qp = QueueProcessor(db)
-    try:
-        task = qp.priority_boost(task_id)
-    except ValueError:
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return SuccessResponse(data={"queue_position": 1, "priority": task.priority})
-
-
-@router.get("/dead-letter", response_model=SuccessResponse)
-async def list_dead_letter_tasks(db: Session = Depends(get_db)):
-    """List all tasks in the dead letter queue."""
-    tasks = db.query(Task).filter(Task.status == TaskStatus.dead_letter).order_by(Task.dlq_at.desc()).limit(100).all()
-    return SuccessResponse(data={
-        "total": len(tasks),
-        "tasks": [
-            {
-                **_task_dict(t),
-                "retry_count": t.retry_count,
-                "max_retries": t.max_retries,
-                "dlq_reason": t.dlq_reason,
-                "dlq_at": t.dlq_at.isoformat() if t.dlq_at else None,
-                "last_error": t.last_error,
-            }
-            for t in tasks
-        ],
-    })
+    task.priority = (task.priority or 0) + 1000
+    db.commit()
+    db.refresh(task)
+    return SuccessResponse(data={"task_id": task.id, "priority": task.priority})
 
 
 @router.post("/{task_id}/retry", response_model=SuccessResponse)
 async def retry_task(task_id: int, db: Session = Depends(get_db)):
-    """Retry a failed or dead-lettered task."""
+    """Re-queue a failed, partial, or cancelled task."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    
-    if task.status not in (TaskStatus.failed, TaskStatus.dead_letter, TaskStatus.partial):
-        raise HTTPException(status_code=400, detail=f"Task cannot be retried (status: {task.status.value})")
-    
-    # Reset task for retry
+
+    if task.status not in (TaskStatus.failed, TaskStatus.partial, TaskStatus.cancelled):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Task cannot be retried (status: {task.status.value})"
+        )
+
     task.status = TaskStatus.queued
     task.started_at = None
     task.completed_at = None
-    task.workers_assigned = "[]"
-    task.failed_workers = "[]"
     task.workers_completed = 0
-    task.retry_count += 1
-    task.dlq_reason = None
-    task.dlq_at = None
-    task.last_error = None
+    task.workers_failed = 0
     db.commit()
-    
-    return SuccessResponse(data={"status": task.status.value, "retry_count": task.retry_count})
+
+    return SuccessResponse(data={"task_id": task.id, "status": task.status.value})

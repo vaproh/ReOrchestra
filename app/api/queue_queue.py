@@ -1,11 +1,10 @@
-"""Queue API endpoints - view and control the queue processor."""
+"""Queue API endpoints — view and control the queue processor."""
 
-import json
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.database import get_db, Task, TaskStatus
-from app.services.queue_manager import QueueManager
+from app.database import get_db, Task, TaskStatus, Account, AccountStatus
+from app.modules.queue import QueueManager
 from app.schemas.common import SuccessResponse
 
 router = APIRouter()
@@ -31,9 +30,11 @@ async def view_queue(db: Session = Depends(get_db)):
                 "target_url": t.target_url,
                 "workers_needed": t.workers_needed,
                 "workers_completed": t.workers_completed or 0,
+                "workers_failed": t.workers_failed or 0,
                 "status": t.status.value,
                 "priority": t.priority,
                 "created_at": t.created_at.isoformat() if t.created_at else None,
+                "started_at": t.started_at.isoformat() if t.started_at else None,
             }
             for i, t in enumerate(tasks)
         ],
@@ -55,6 +56,29 @@ async def stop_queue():
 
 
 @router.get("/status", response_model=SuccessResponse)
-async def queue_status():
+async def queue_status(db: Session = Depends(get_db)):
     manager = QueueManager.get()
-    return SuccessResponse(data={"processing": manager.is_running()})
+
+    # Account availability stats
+    total_accounts = db.query(Account).count()
+    logged_in = db.query(Account).filter(Account.status == AccountStatus.logged_in).count()
+    rate_limited = db.query(Account).filter(Account.status == AccountStatus.rate_limited).count()
+    dead = db.query(Account).filter(Account.status.in_([AccountStatus.dead, AccountStatus.banned])).count()
+
+    # Task stats
+    queued_count = db.query(Task).filter(Task.status == TaskStatus.queued).count()
+    running_count = db.query(Task).filter(Task.status == TaskStatus.running).count()
+
+    return SuccessResponse(data={
+        "processing": manager.is_running(),
+        "queue": {
+            "queued": queued_count,
+            "running": running_count,
+        },
+        "accounts": {
+            "total": total_accounts,
+            "available": logged_in,
+            "rate_limited": rate_limited,
+            "dead": dead,
+        },
+    })

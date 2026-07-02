@@ -6,9 +6,9 @@ import requests as http_requests
 import logging
 
 from app.database import get_db, Account, Post, Proxy
-from app.models import TaskActionLog, Worker
+from app.models import TaskExecutionLog, CamofoxSlot
 from app.models import AccountStatus, AccountType, PostStatus
-from app.schemas.common import SuccessResponse, StatsResponse
+from app.schemas.common import SuccessResponse
 from app.config import get_settings
 
 logger = logging.getLogger("admin")
@@ -65,6 +65,7 @@ async def get_stats(db: Session = Depends(get_db)):
         "fresh": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.fresh).scalar() or 0,
         "logged_in": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.logged_in).scalar() or 0,
         "session_expired": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.session_expired).scalar() or 0,
+        "rate_limited": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.rate_limited).scalar() or 0,
         "banned": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.banned).scalar() or 0,
         "dead": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.dead).scalar() or 0,
     }
@@ -73,18 +74,18 @@ async def get_stats(db: Session = Depends(get_db)):
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
 
-    actions_today = db.query(func.count(TaskActionLog.id)).filter(TaskActionLog.created_at >= today).scalar() or 0
-    actions_week = db.query(func.count(TaskActionLog.id)).filter(TaskActionLog.created_at >= week_ago).scalar() or 0
-    actions_month = db.query(func.count(TaskActionLog.id)).filter(TaskActionLog.created_at >= month_ago).scalar() or 0
+    actions_today = db.query(func.count(TaskExecutionLog.id)).filter(TaskExecutionLog.created_at >= today).scalar() or 0
+    actions_week = db.query(func.count(TaskExecutionLog.id)).filter(TaskExecutionLog.created_at >= week_ago).scalar() or 0
+    actions_month = db.query(func.count(TaskExecutionLog.id)).filter(TaskExecutionLog.created_at >= month_ago).scalar() or 0
 
     actions_by_type = {
-        "upvote": db.query(func.count(TaskActionLog.id)).filter(
-            TaskActionLog.action_type.in_(["upvote_post", "upvote_comment"]),
-            TaskActionLog.created_at >= month_ago,
+        "upvote": db.query(func.count(TaskExecutionLog.id)).filter(
+            TaskExecutionLog.action_type.in_(["upvote_post", "upvote_comment"]),
+            TaskExecutionLog.created_at >= month_ago,
         ).scalar() or 0,
-        "downvote": db.query(func.count(TaskActionLog.id)).filter(
-            TaskActionLog.action_type.in_(["downvote_post", "downvote_comment"]),
-            TaskActionLog.created_at >= month_ago,
+        "downvote": db.query(func.count(TaskExecutionLog.id)).filter(
+            TaskExecutionLog.action_type.in_(["downvote_post", "downvote_comment"]),
+            TaskExecutionLog.created_at >= month_ago,
         ).scalar() or 0,
         "login": 0,
     }
@@ -97,10 +98,18 @@ async def get_stats(db: Session = Depends(get_db)):
 
     votes_today = db.query(func.sum(Account.votes_today)).scalar() or 0
 
+    slots = db.query(CamofoxSlot).all()
+    slot_stats = {
+        "total": len(slots),
+        "running": sum(1 for s in slots if s.status == "running"),
+        "crashed": sum(1 for s in slots if s.status == "crashed"),
+        "total_capacity": sum(s.max_concurrent for s in slots),
+    }
+
     return SuccessResponse(data={
         "accounts": {
             "total": total_accounts,
-            "active": alive_accounts,
+            "alive": alive_accounts,
             "dead": dead_accounts,
             "proxies": total_proxies,
             "votes_today": votes_today,
@@ -122,10 +131,5 @@ async def get_stats(db: Session = Depends(get_db)):
             "posted": posted_posts,
             "total_karma_gained": total_karma,
         },
-        "slots": {
-            "total": 0,
-            "running": 0,
-            "crashed": 0,
-            "total_capacity": 0,
-        },
+        "slots": slot_stats,
     })

@@ -6,7 +6,7 @@ import os
 import hashlib
 
 from app.database import get_db, Account, AccountStatus, AccountType
-from app.models import TaskActionLog, Worker
+from app.models import TaskExecutionLog
 from app.schemas.account import (
     AccountResponse,
     AccountDetailResponse,
@@ -19,7 +19,7 @@ from app.schemas.account import (
 )
 from app.schemas.common import SuccessResponse, PaginationMeta
 from app.config import get_settings
-from app.services.browser import list_profile_ids
+from app.modules.executor.browser import list_profile_ids
 
 router = APIRouter()
 
@@ -121,7 +121,9 @@ async def get_account(
         raise HTTPException(status_code=404, detail="Account not found")
 
     is_valid, age_hours = session_valid(account.username)
-    recent = db.query(TaskActionLog).join(Worker).filter(Worker.account_id == account_id).order_by(TaskActionLog.created_at.desc()).limit(10).all()
+    recent = db.query(TaskExecutionLog).filter(
+        TaskExecutionLog.account_id == account_id
+    ).order_by(TaskExecutionLog.created_at.desc()).limit(10).all()
 
     return SuccessResponse(data={
         **AccountDetailResponse(
@@ -225,7 +227,7 @@ async def login_accounts(
     request: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    from app.services.login import LoginService
+    from app.modules.accounts.login import LoginService
 
     accounts = db.query(Account).filter(Account.id.in_(request.account_ids)).all()
     if not accounts:
@@ -267,7 +269,7 @@ async def login_simple(
     db: Session = Depends(get_db),
 ):
     """Login with username and password directly (no account ID needed)."""
-    from app.services.login import LoginService
+    from app.modules.accounts.login import LoginService
 
     username = request.get("username")
     password = request.get("password")
@@ -307,7 +309,7 @@ async def batch_login_accounts(
     if not accounts:
         raise HTTPException(status_code=404, detail="No accounts found")
 
-    from app.services.login import LoginService
+    from app.modules.accounts.login import LoginService
     service = LoginService()
     results = []
 

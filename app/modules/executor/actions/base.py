@@ -15,11 +15,14 @@ import re
 import time
 import random
 import hashlib
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 from app.config import get_settings
-from app.services.browser import CamofoxClient, Tab
+from app.modules.executor.browser import CamofoxClient, Tab
+
+logger = logging.getLogger("base_action")
 
 
 @dataclass
@@ -130,7 +133,7 @@ class BaseAction:
     # Core execution flow
     # ------------------------------------------------------------------
 
-    def execute(self, worker, target_url: str) -> ActionResult:
+    def execute(self, account, target_url: str) -> ActionResult:
         """
         Default execution flow:
         1. Open tab & navigate
@@ -144,8 +147,8 @@ class BaseAction:
         tab: Optional[Tab] = None
         try:
             url = self.normalize_url(target_url)
-            session_key = f"wq_{worker.id}_{self.action_type}"
-            user_id = f"s_{worker.account_id}"
+            session_key = f"wq_{account.id}_{self.action_type}"
+            user_id = f"s_{account.id}"
 
             # Set on client BEFORE create_tab so the Tab gets correct user_id/session_key
             self.camofox.user_id = user_id
@@ -206,10 +209,11 @@ class BaseAction:
             )
 
         except Exception as e:
+            logger.exception(f"Action {self.action_type} failed for account {getattr(account, 'id', None)}")
             return ActionResult(
                 success=False,
                 outcome="failed",
-                error=str(e),
+                error=f"{type(e).__name__}: {e}",
                 duration_ms=int((time.time() - started) * 1000),
             )
         finally:
@@ -234,6 +238,9 @@ class BaseAction:
         return True, None
 
 
-def dedup_hash(worker_id: int, action_type: str, target_url: str) -> str:
-    raw = f"{worker_id}:{action_type}:{target_url}"
+def dedup_hash(account_id: int, action_type: str, target_url: str) -> str:
+    """SHA-256[:16] of account_id:action_type:target_url.
+    Prevents the same account succeeding the same action on the same target twice.
+    """
+    raw = f"{account_id}:{action_type}:{target_url}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]

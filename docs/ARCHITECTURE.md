@@ -208,7 +208,7 @@ The system uses **Camofox** as its browser automation layer instead of raw HTTP 
 
 ### 2.4 Queue System Architecture
 
-The queue system enables scalable, distributed task processing:
+The queue system enables simple, scalable, task-based processing:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -220,19 +220,22 @@ The queue system enables scalable, distributed task processing:
 │  2. Task stored in DB (status=queued)                           │
 │           │                                                     │
 │           ▼                                                     │
-│  3. QueueProcessor background thread picks task                  │
+│  3. QueueProcessor loop picks highest priority queued task      │
 │           │                                                     │
 │           ▼                                                     │
-│  4. Assigns idle workers (up to workers_needed)                  │
+│  4. Finds idle accounts (logged_in status, not busy, deduped)   │
 │           │                                                     │
 │           ▼                                                     │
-│  5. Each worker executes action via Camofox                      │
+│  5. Concurrently executes action (max 3 at a time)              │
 │           │                                                     │
 │           ▼                                                     │
-│  6. Results logged to TaskActionLog                             │
+│  6. Handles failures by reassigning to new accounts             │
 │           │                                                     │
 │           ▼                                                     │
-│  7. Task marked: completed/partial/failed                        │
+│  7. Logs results to TaskExecutionLog                            │
+│           │                                                     │
+│           ▼                                                     │
+│  8. Task marked completed, partial, failed, or cancelled        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -405,40 +408,43 @@ Client                    API                      Service                   Cam
 ### 4.2 Queue Task Flow
 
 ```
-Client              API              QueueProcessor         WorkerPool           Camofox
-   │                │                     │                    │                  │
-   │ POST /api/tasks │                     │                    │                  │
-   │ {action, url,   │                     │                    │                  │
-   │  workers_needed}│                     │                    │                  │
-   │────────────────▶│                     │                    │                  │
-   │ 201 Created    │                     │                    │                  │
-   │◀────────────────│                     │                    │                  │
-   │                │                     │                    │                  │
-   │                │ (background)        │                    │                  │
-   │                │────────────────────▶│                    │                  │
-   │                │                     │                    │                  │
-   │                │                     │ next_task()        │                  │
-   │                │                     │◀───────────────────│                  │
-   │                │                     │                    │                  │
-   │                │                     │ assign_workers()   │                  │
-   │                │                     │───────────────────▶│                  │
-   │                │                     │                    │                  │
-   │                │                     │                    │ idle workers     │
-   │                │                     │                    │◀─────────────────│
-   │                │                     │                    │                  │
-   │                │                     │ For each worker:   │                  │
-   │                │                     │───────────────────▶│                  │
-   │                │                     │                    │                  │
-   │                │                     │                    │ execute_action()│
-   │                │                     │                    │────────┐        │
-   │                │                     │                    │        │        │
-   │                │                     │                    │◀───────┴───────│
-   │                │                     │                    │ ActionResult   │
-   │                │                     │◀───────────────────│                  │
-   │                │                     │                    │                  │
-   │                │                     │ update task status │                  │
-   │                │                     │◀───────────────────│                  │
-   │                │                     │                    │                  │
+Client              API              QueueProcessor            Account/Camofox
+   │                │                     │                          │
+   │ POST /api/tasks │                     │                          │
+   │ {action, url,   │                     │                          │
+   │  workers_needed}│                     │                          │
+   │────────────────▶│                     │                          │
+   │ 201 Created    │                     │                          │
+   │◀────────────────│                     │                          │
+   │                │                     │                          │
+   │                │ (background loop)   │                          │
+   │                │────────────────────▶│                          │
+   │                │                     │                          │
+   │                │                     │ loop:                    │
+   │                │                     │ get_next_task()          │
+   │                │                     │                          │
+   │                │                     │ while task incomplete:   │
+   │                │                     │ find_idle_account()      │
+   │                │                     │                          │
+   │                │                     │ execute_with_retries()   │
+   │                │                     │─────────────────────────▶│
+   │                │                     │                          │ (Camofox tab navigate & click)
+   │                │                     │◀─────────────────────────│
+   │                │                     │ ActionResult (outcome)   │
+   │                │                     │                          │
+   │                │                     │ if success:              │
+   │                │                     │   task.completed += 1    │
+   │                │                     │ if dead/banned:          │
+   │                │                     │   mark account dead      │
+   │                │                     │   task.failed += 1       │
+   │                │                     │   (loop reassigns next)  │
+   │                │                     │ if rate_limited:         │
+   │                │                     │   mark account limited   │
+   │                │                     │   task.failed += 1       │
+   │                │                     │                          │
+   │                │                     │ Update task final status │
+   │                │                     │ (completed/partial/etc.) │
+   │                │                     │                          │
 ```
 
 ### 4.3 Login Flow

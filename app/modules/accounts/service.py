@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,10 +8,12 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.models import Account, AccountStatus
-from app.services.proxy_service import ProxyService
-from app.services.sticky_proxy import StickyProxyClient
-from app.services.rate_limiter import RateLimiter
-from app.services.burn_detector import BurnDetector
+from app.modules.proxies.service import ProxyService
+from app.modules.proxies.sticky import StickyProxyClient
+from app.modules.executor.rate_limiter import RateLimiter
+from app.modules.executor.burn_detector import BurnDetector
+
+logger = logging.getLogger("account_service")
 
 
 @dataclass
@@ -46,8 +49,8 @@ class AccountService:
         try:
             self.camofox.set_proxy(user_id, proxy.proxy_string)
             return True
-        except Exception as e:
-            print(f"Failed to set proxy for {account.username}: {e}")
+        except Exception:
+            logger.exception(f"Failed to set proxy for {account.username}")
             return False
 
     def login(self, db: Session, account_id: int, headless: bool = True) -> dict:
@@ -165,7 +168,7 @@ class AccountService:
         try:
             health = self.camofox.health_check()
             return health.get("browserConnected", False)
-        except:
+        except Exception:
             return False
 
     def get_active_tab(self, account_id: int) -> Optional[str]:

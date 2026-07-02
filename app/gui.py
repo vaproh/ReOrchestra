@@ -144,9 +144,8 @@ GUI_HTML = """<!DOCTYPE html>
       <label>Username</label>
       <input type="text" id="login-username" placeholder="username">
       <label>Password</label>
-      <input type="text" id="login-password" placeholder="password">
-      <label>Headless</label>
-      <select id="login-headless"><option value="false">No (watch)</option><option value="true">Yes (headless)</option></select>
+      <input type="password" id="login-password" placeholder="password">
+      <label><input type="checkbox" id="login-headless"> Headless mode</label>
       <button onclick="loginAccount()">Login</button>
       <div class="result" id="login-result"></div>
     </div>
@@ -157,8 +156,8 @@ GUI_HTML = """<!DOCTYPE html>
       <h2>Upvote Post</h2>
       <label>Post URL</label>
       <input type="text" id="upvote-url" placeholder="https://www.reddit.com/r/.../comments/xyz/...">
-      <label>Account username</label>
-      <input type="text" id="upvote-username" placeholder="account username">
+      <label>Workers</label>
+      <input type="number" id="upvote-workers" value="1" min="1" max="100">
       <button id="upvote-btn" onclick="doVote('up')">Upvote</button>
       <div class="result" id="upvote-result"></div>
     </div>
@@ -167,8 +166,8 @@ GUI_HTML = """<!DOCTYPE html>
       <h2>Downvote Post</h2>
       <label>Post URL</label>
       <input type="text" id="downvote-url" placeholder="https://www.reddit.com/r/.../comments/xyz/...">
-      <label>Account username</label>
-      <input type="text" id="downvote-username" placeholder="account username">
+      <label>Workers</label>
+      <input type="number" id="downvote-workers" value="1" min="1" max="100">
       <button id="downvote-btn" onclick="doVote('down')">Downvote</button>
       <div class="result" id="downvote-result"></div>
     </div>
@@ -292,16 +291,16 @@ async function refreshStatus() {
 async function loginAccount() {
   const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
-  const headless = document.getElementById('login-headless').value === 'true';
+  const headless = document.getElementById('login-headless').checked;
   if (!username || !password) { log('Enter username + password', 'err'); return; }
   log('Logging in ' + username + '...', 'info');
   try {
-    const data = await api('/accounts/login', 'POST', {
-      account_ids: [],
-      force: false,
-      options: { headless: headless }
+    const data = await api('/accounts/login/simple', 'POST', {
+      username: username,
+      password: password,
+      headless: headless
     });
-    log('Login result: ' + JSON.stringify(data.data), data.data && data.data.logged_in > 0 ? 'ok' : 'err');
+    log('Login result: ' + JSON.stringify(data.data), data.data && data.data.success ? 'ok' : 'err');
     document.getElementById('login-result').textContent = JSON.stringify(data.data);
   } catch (e) {
     log('Login failed: ' + e.message, 'err');
@@ -311,19 +310,18 @@ async function loginAccount() {
 
 async function doVote(dir) {
   const url = document.getElementById(dir + 'vote-url').value;
-  const username = document.getElementById(dir + 'vote-username').value;
-  if (!url || !username) { log('Enter URL + username', 'err'); return; }
-  log('Voting ' + dir + ' via browser for ' + username + ' on ' + url, 'info');
+  const workers = parseInt(document.getElementById(dir + 'vote-workers').value) || 1;
+  if (!url) { log('Enter URL', 'err'); return; }
+  log('Creating ' + dir + 'vote task for ' + url, 'info');
   try {
-    const data = await api('/actions/' + dir + 'vote', 'POST', {
-      account_ids: [],
-      filters: {},
-      username: username,
-      target_url: url
+    const actionType = dir === 'up' ? 'upvote_post' : 'downvote_post';
+    const data = await api('/tasks', 'POST', {
+      action_type: actionType,
+      target_url: url,
+      workers_needed: workers
     });
     const d = data.data || {};
-    log('Vote result: ' + (d.succeeded || 0) + '/' + (d.total || 0) + ' succeeded', d.succeeded > 0 ? 'ok' : 'err');
-    if (d.results) d.results.forEach(r => log('  -> ' + r.username + ': ' + (r.success ? 'OK' : 'FAIL ' + (r.error || '')), r.success ? 'ok' : 'err'));
+    log('Task created: ID ' + (d.task_id || 'unknown'), 'ok');
     document.getElementById(dir + 'vote-result').textContent = JSON.stringify(data.data);
   } catch (e) {
     log('Vote failed: ' + e.message, 'err');

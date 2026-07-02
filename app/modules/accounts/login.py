@@ -9,7 +9,7 @@ from typing import Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 from app.config import get_settings
-from app.services.browser import CamofoxClient
+from app.modules.executor.browser import CamofoxClient
 from app.models import get_db, Account
 
 logger = logging.getLogger("login")
@@ -165,7 +165,7 @@ class LoginService:
             if file_age_hours > get_settings().max_session_age_hours:
                 logger.info(f"login | session_expired | username={username} age_hours={file_age_hours:.1f}")
                 return False
-            
+
             with open(session_path, "r") as f:
                 data = json.load(f)
             return data.get("logged_in", False)
