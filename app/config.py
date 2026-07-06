@@ -49,10 +49,6 @@ class Settings(BaseSettings):
     # ===== CORS =====
     cors_allowed_origins: str = "*"
 
-    # ===== CAPTCHA =====
-    capsolver_api_key: str | None = None
-    twocaptcha_api_key: str | None = None
-
     # ===== TIMEOUTS (seconds) =====
     timeout_camofox_tab_create: int = 15
     timeout_camofox_navigate: int = 30
