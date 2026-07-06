@@ -121,7 +121,10 @@ class BaseAction:
         # Check for banned first since banned accounts can't be recovered
         if "banned from reddit" in lower or "account has been banned" in lower:
             return "banned"
-        if "suspended your account" in lower or "account due to suspicious activity" in lower:
+        if (
+            "suspended your account" in lower
+            or "account due to suspicious activity" in lower
+        ):
             return "suspended"
         return None
 
@@ -253,7 +256,9 @@ class BaseAction:
             )
 
         except Exception as e:
-            logger.exception(f"Action {self.action_type} failed for account {getattr(account, 'id', None)}")
+            logger.exception(
+                f"Action {self.action_type} failed for account {getattr(account, 'id', None)}"
+            )
             return ActionResult(
                 success=False,
                 outcome="failed",

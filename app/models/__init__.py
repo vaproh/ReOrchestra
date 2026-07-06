@@ -1,4 +1,14 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Enum as SQLEnum, ForeignKey
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Text,
+    Enum as SQLEnum,
+    ForeignKey,
+)
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship, validates
 from datetime import datetime
 import enum
@@ -39,7 +49,6 @@ class Account(Base):
     bearer_token = Column(String(512), nullable=True)
     user_agent = Column(String(256), nullable=True)
     proxy = Column(String(64), nullable=True)
-
 
     status = Column(SQLEnum(AccountStatus), default=AccountStatus.fresh)
     account_type = Column(SQLEnum(AccountType), default=AccountType.upvoter)
@@ -158,18 +167,23 @@ class Task(Base):
         if value < 1:
             raise ValueError("workers_needed must be at least 1")
         return value
-    workers_completed = Column(Integer, default=0)   # successful executions
-    workers_failed = Column(Integer, default=0)      # failed/replaced executions
+
+    workers_completed = Column(Integer, default=0)  # successful executions
+    workers_failed = Column(Integer, default=0)  # failed/replaced executions
 
     status = Column(SQLEnum(TaskStatus), default=TaskStatus.queued)
-    priority = Column(Integer, default=0)            # higher = sooner
+    priority = Column(Integer, default=0)  # higher = sooner
 
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    logs = relationship("TaskExecutionLog", back_populates="task", order_by="TaskExecutionLog.created_at")
+    logs = relationship(
+        "TaskExecutionLog",
+        back_populates="task",
+        order_by="TaskExecutionLog.created_at",
+    )
 
     @validates("workers_needed")
     def validate_workers_needed(self, key, value):
@@ -184,6 +198,7 @@ class TaskExecutionLog(Base):
     Replaces the old TaskActionLog/Worker-based model.
     Deduplication key: account_id + action_type + target_url.
     """
+
     __tablename__ = "queue_execution_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -216,7 +231,9 @@ class TaskExecutionLog(Base):
 _settings = get_settings()
 engine = create_engine(
     _settings.database_url,
-    connect_args={"check_same_thread": False, "timeout": 30} if "sqlite" in _settings.database_url else {}
+    connect_args={"check_same_thread": False, "timeout": 30}
+    if "sqlite" in _settings.database_url
+    else {},
 )
 
 if "sqlite" in _settings.database_url:
@@ -228,6 +245,7 @@ if "sqlite" in _settings.database_url:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

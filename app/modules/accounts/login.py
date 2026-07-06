@@ -59,8 +59,19 @@ def _do_login_sync(
         client.wait(tab)
 
         snapshot, _ = client.snapshot_quick(tab)
-        if "welcome back" in snapshot.lower() and "already logged in" in snapshot.lower():
-            _save_session(username, session_dir, {"username": username, "logged_in": True, "url": "https://www.reddit.com/"})
+        if (
+            "welcome back" in snapshot.lower()
+            and "already logged in" in snapshot.lower()
+        ):
+            _save_session(
+                username,
+                session_dir,
+                {
+                    "username": username,
+                    "logged_in": True,
+                    "url": "https://www.reddit.com/",
+                },
+            )
             logger.debug(f"Session valid: {username}", extra={"username": username})
             return True, 1000
 
@@ -80,16 +91,30 @@ def _do_login_sync(
         snapshot, url = client.snapshot_quick(tab)
 
         if "login" not in url.lower():
-            _save_session(username, session_dir, {"username": username, "logged_in": True, "url": url})
+            _save_session(
+                username,
+                session_dir,
+                {"username": username, "logged_in": True, "url": url},
+            )
             elapsed_ms = int((time.time() - start_time) * 1000)
-            logger.info(f"Login success: {username} ({elapsed_ms}ms)", extra={"username": username, "ms": elapsed_ms})
+            logger.info(
+                f"Login success: {username} ({elapsed_ms}ms)",
+                extra={"username": username, "ms": elapsed_ms},
+            )
             return True, 5000
 
-        logger.warning(f"Login failed: {username} - invalid_credentials", extra={"username": username, "reason": "invalid_credentials"})
+        logger.warning(
+            f"Login failed: {username} - invalid_credentials",
+            extra={"username": username, "reason": "invalid_credentials"},
+        )
         return False, 0
 
     except Exception as e:
-        logger.error(f"Login error: {username} - {e}", extra={"username": username, "error": str(e)}, exc_info=True)
+        logger.error(
+            f"Login error: {username} - {e}",
+            extra={"username": username, "error": str(e)},
+            exc_info=True,
+        )
         return False, 0
 
     finally:
@@ -124,7 +149,10 @@ class LoginService:
                 logger.debug(f"Session valid: {username}", extra={"username": username})
                 return True, 0
 
-        logger.info(f"Login attempt: {username}", extra={"username": username, "has_proxy": has_proxy})
+        logger.info(
+            f"Login attempt: {username}",
+            extra={"username": username, "has_proxy": has_proxy},
+        )
 
         account_id = None
         db = next(get_db())
@@ -157,19 +185,29 @@ class LoginService:
         if not os.path.exists(session_path):
             return False
         try:
-            file_age_hours = (datetime.now(UTC) - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
+            file_age_hours = (
+                datetime.now(UTC)
+                - datetime.fromtimestamp(os.path.getmtime(session_path))
+            ).total_seconds() / 3600
             if file_age_hours > get_settings().max_session_age_hours:
-                logger.info(f"Session expired: {username} ({file_age_hours:.1f}h)", extra={"username": username, "hours": file_age_hours})
+                logger.info(
+                    f"Session expired: {username} ({file_age_hours:.1f}h)",
+                    extra={"username": username, "hours": file_age_hours},
+                )
                 return False
 
             with open(session_path, "r") as f:
                 data = json.load(f)
             return data.get("logged_in", False)
         except (json.JSONDecodeError, OSError):
-            logger.warning(f"Session file corrupt: {username}", extra={"username": username})
+            logger.warning(
+                f"Session file corrupt: {username}", extra={"username": username}
+            )
             return False
         except Exception as e:
-            logger.error(f"Session validation error: {username} - {e}", extra={"username": username, "error": str(e)}, exc_info=True)
+            logger.error(
+                f"Session validation error: {username} - {e}",
+                extra={"username": username, "error": str(e)},
+                exc_info=True,
+            )
             return False
-
-

@@ -5,7 +5,11 @@ import logging
 
 from app.database import get_db, Proxy
 from app.schemas.common import SuccessResponse
-from app.schemas.proxy import ProxyImportRequest, ProxyReplaceRequest, ProxyMarkDeadRequest
+from app.schemas.proxy import (
+    ProxyImportRequest,
+    ProxyReplaceRequest,
+    ProxyMarkDeadRequest,
+)
 
 logger = logging.getLogger("proxies")
 
@@ -22,7 +26,9 @@ async def list_proxies(
 
     if status:
         if status not in ("active", "dead"):
-            raise HTTPException(status_code=400, detail="Invalid status. Valid: active, dead")
+            raise HTTPException(
+                status_code=400, detail="Invalid status. Valid: active, dead"
+            )
         query = query.filter(Proxy.status == status)
     if assigned is True:
         query = query.filter(Proxy.assigned_account_id != None)
@@ -31,28 +37,30 @@ async def list_proxies(
 
     proxies = query.all()
 
-    return SuccessResponse(data={
-        "total": len(proxies),
-        "proxies": [
-            {
-                "id": p.id,
-                "proxy_string": p.proxy_string,
-                "host": p.host,
-                "port": p.port,
-                "username": p.username,
-                "proxy_type": p.proxy_type,
-                "provider": p.provider,
-                "assigned_account_id": p.assigned_account_id,
-                "status": p.status,
-                "is_active": p.is_active,
-                "fail_count": p.fail_count,
-                "last_error": p.last_error,
-                "last_used": p.last_used.isoformat() if p.last_used else None,
-                "added_at": p.added_at.isoformat() if p.added_at else None,
-            }
-            for p in proxies
-        ],
-    })
+    return SuccessResponse(
+        data={
+            "total": len(proxies),
+            "proxies": [
+                {
+                    "id": p.id,
+                    "proxy_string": p.proxy_string,
+                    "host": p.host,
+                    "port": p.port,
+                    "username": p.username,
+                    "proxy_type": p.proxy_type,
+                    "provider": p.provider,
+                    "assigned_account_id": p.assigned_account_id,
+                    "status": p.status,
+                    "is_active": p.is_active,
+                    "fail_count": p.fail_count,
+                    "last_error": p.last_error,
+                    "last_used": p.last_used.isoformat() if p.last_used else None,
+                    "added_at": p.added_at.isoformat() if p.added_at else None,
+                }
+                for p in proxies
+            ],
+        }
+    )
 
 
 @router.post("/import", response_model=SuccessResponse)
@@ -102,10 +110,12 @@ async def import_proxies(
 
     logger.info("Importing %s proxies", imported)
 
-    return SuccessResponse(data={
-        "imported": imported,
-        "skipped": skipped,
-    })
+    return SuccessResponse(
+        data={
+            "imported": imported,
+            "skipped": skipped,
+        }
+    )
 
 
 @router.post("/replace", response_model=SuccessResponse)
@@ -115,14 +125,18 @@ async def replace_dead_proxies(
 ):
     new_proxy_strings = request.proxies
 
-    dead_proxies = db.query(Proxy).filter(Proxy.status == "dead").order_by(Proxy.id).all()
+    dead_proxies = (
+        db.query(Proxy).filter(Proxy.status == "dead").order_by(Proxy.id).all()
+    )
 
     if not dead_proxies:
-        return SuccessResponse(data={
-            "replaced": 0,
-            "skipped": 0,
-            "remaining_dead": 0,
-        })
+        return SuccessResponse(
+            data={
+                "replaced": 0,
+                "skipped": 0,
+                "remaining_dead": 0,
+            }
+        )
 
     replaced = 0
     skipped = 0
@@ -174,11 +188,13 @@ async def replace_dead_proxies(
 
     logger.info("Replace dead proxies")
 
-    return SuccessResponse(data={
-        "replaced": replaced,
-        "skipped": skipped,
-        "remaining_dead": remaining_dead,
-    })
+    return SuccessResponse(
+        data={
+            "replaced": replaced,
+            "skipped": skipped,
+            "remaining_dead": remaining_dead,
+        }
+    )
 
 
 @router.delete("/{proxy_id}", response_model=SuccessResponse)

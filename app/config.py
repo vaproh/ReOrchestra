@@ -76,7 +76,11 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         if not self.cors_allowed_origins:
             return ["*"]
-        origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+        origins = [
+            origin.strip()
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        ]
         return origins if origins else ["*"]
 
 

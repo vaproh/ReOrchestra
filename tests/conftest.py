@@ -31,10 +31,12 @@ os.environ.setdefault("LOG_LEVEL", "CRITICAL")
 # In-memory database session
 # =============================================================================
 
+
 @pytest.fixture(scope="function")
 def db_engine(tmp_path):
     """Create a fresh SQLite engine per test using a temp file."""
     from sqlalchemy import create_engine
+
     db_path = tmp_path / "test.db"
     engine = create_engine(
         f"sqlite:///{db_path}",
@@ -60,15 +62,15 @@ def db_session(db_engine):
     """Create a fresh DB session per test with all tables created."""
     from sqlalchemy.orm import sessionmaker
     from app.models import Base
-    
+
     # Create all tables
     Base.metadata.create_all(bind=db_engine)
-    
+
     Session = sessionmaker(bind=db_engine, autocommit=False, autoflush=False)
     session = Session()
-    
+
     yield session
-    
+
     session.rollback()
     session.close()
 
@@ -77,8 +79,10 @@ def db_session(db_engine):
 # Mock Camofox Client
 # =============================================================================
 
+
 class Tab:
     """Mock Tab object matching CamofoxClient.Tab structure."""
+
     def __init__(self, tab_id: str, user_id: str, session_key: str):
         self.tab_id = tab_id
         self.user_id = user_id
@@ -87,9 +91,15 @@ class Tab:
 
 class ActionResult:
     """Mock ActionResult for the mock executor."""
-    def __init__(self, success: bool, outcome: str = "failed", 
-                 error: Optional[str] = None, duration_ms: int = 0,
-                 clicked_ref: Optional[str] = None):
+
+    def __init__(
+        self,
+        success: bool,
+        outcome: str = "failed",
+        error: Optional[str] = None,
+        duration_ms: int = 0,
+        clicked_ref: Optional[str] = None,
+    ):
         self.success = success
         self.outcome = outcome
         self.error = error
@@ -177,7 +187,7 @@ class MockCamofoxClient:
         if len(parts) >= 3:
             return parts[-1]  # Last part is action_type
         return "upvote_post"  # Default
-        
+
     def configure(
         self,
         success_rate: float = 1.0,
@@ -201,11 +211,11 @@ class MockCamofoxClient:
             "fail_count": fail_count,
             "fail_remaining": fail_count,
         }
-        
+
     def set_account_response(self, account_id: int, response: str):
         """Set a deterministic response for a specific account."""
         self._account_responses[account_id] = response
-        
+
     def _generate_response(self, account_id: Optional[int] = None) -> str:
         """Generate a response based on config or queue."""
         # Check queue first
@@ -215,50 +225,50 @@ class MockCamofoxClient:
                 self._queue_index += 1
                 return response
             return "success"  # Default to success when queue exhausted
-            
+
         # Check per-account deterministic mapping
         if account_id and account_id in self._account_responses:
             return self._account_responses[account_id]
-            
+
         # Check if we're in "fail mode"
         if self.config["fail_remaining"] > 0:
             self.config["fail_remaining"] -= 1
             return "element_not_found"
-        
+
         # Random based on configured rates
         r = random.random()
         cumulative = 0.0
-        
+
         cumulative += self.config["success_rate"]
         if r < cumulative:
             return "success"
-        
+
         cumulative += self.config["popup_suspended_rate"]
         if r < cumulative:
             return "popup_suspended"
-        
+
         cumulative += self.config["popup_rate_limited_rate"]
         if r < cumulative:
             return "popup_rate_limited"
-        
+
         cumulative += self.config["header_banned_rate"]
         if r < cumulative:
             return "header_banned"
-        
+
         cumulative += self.config["header_suspended_rate"]
         if r < cumulative:
             return "header_suspended"
-        
+
         cumulative += self.config["element_not_found_rate"]
         if r < cumulative:
             return "element_not_found"
-        
+
         cumulative += self.config["click_timeout_rate"]
         if r < cumulative:
             return "click_timeout"
-        
+
         return "success"
-    
+
     def create_tab(self, url: str = "about:blank") -> Tab:
         """Mock create_tab."""
         tab_id = f"tab_{uuid.uuid4().hex[:8]}"
@@ -274,69 +284,75 @@ class MockCamofoxClient:
 
         self.calls.append({"method": "create_tab", "url": url, "tab_id": tab_id})
         return tab
-    
+
     def navigate(self, tab: Tab, url: str, wait: float = 5.0) -> str:
         """Mock navigate."""
         self._tab_urls[tab.tab_id] = url
         self.calls.append({"method": "navigate", "tab_id": tab.tab_id, "url": url})
         return url
-    
+
     def wait(self, tab: Tab, timeout: int = 5000, wait_network: bool = True) -> dict:
         """Mock wait."""
         self.calls.append({"method": "wait", "tab_id": tab.tab_id, "timeout": timeout})
         return {"ok": True, "ready": True}
-    
+
     def snapshot_quick(self, tab: Tab) -> tuple[str, str]:
         """Mock snapshot_quick - returns snapshot and URL."""
         self.calls.append({"method": "snapshot_quick", "tab_id": tab.tab_id})
         snapshot = self._tab_snapshots.get(tab.tab_id, "")
         url = self._tab_urls.get(tab.tab_id, "https://reddit.com")
         return snapshot, url
-    
+
     def set_snapshot(self, tab: Tab, snapshot: str, url: Optional[str] = None):
         """Set a specific snapshot for a tab (for testing)."""
         self._tab_snapshots[tab.tab_id] = snapshot
         if url:
             self._tab_urls[tab.tab_id] = url
-    
-    def snapshot(self, tab: Tab, wait_ready: bool = True, timeout: int = 5000) -> tuple[str, str]:
+
+    def snapshot(
+        self, tab: Tab, wait_ready: bool = True, timeout: int = 5000
+    ) -> tuple[str, str]:
         """Mock snapshot."""
         return self.snapshot_quick(tab)
-    
+
     def type_text(self, tab: Tab, ref: str, text: str, delay: float = 0.5) -> None:
         """Mock type_text."""
         self.calls.append({"method": "type_text", "tab_id": tab.tab_id, "ref": ref})
-    
+
     def click(self, tab: Tab, ref: str, delay: float = 2.0) -> None:
         """Mock click."""
         self.calls.append({"method": "click", "tab_id": tab.tab_id, "ref": ref})
-    
-    def scroll(self, tab: Tab, direction: str = "down", amount: int = 800, delay: float = 1.0) -> None:
+
+    def scroll(
+        self, tab: Tab, direction: str = "down", amount: int = 800, delay: float = 1.0
+    ) -> None:
         """Mock scroll."""
         self.calls.append({"method": "scroll", "tab_id": tab.tab_id})
-    
+
     def close_tab(self, tab: Tab) -> None:
         """Mock close_tab."""
         self.calls.append({"method": "close_tab", "tab_id": tab.tab_id})
         self._tabs.pop(tab.tab_id, None)
-    
+
     def health(self) -> dict:
         """Mock health check."""
         return {"ok": True, "status": "running"}
-    
+
     def set_user_proxy(self, user_id: str, proxy: str) -> dict:
         """Mock set_user_proxy."""
-        self.calls.append({"method": "set_user_proxy", "user_id": user_id, "proxy": proxy})
+        self.calls.append(
+            {"method": "set_user_proxy", "user_id": user_id, "proxy": proxy}
+        )
         return {"ok": True}
-    
+
     def get_last_tab(self) -> Optional[Tab]:
         """Get the most recently created tab (for testing)."""
         return list(self._tabs.values())[-1] if self._tabs else None
-    
+
     def clear_calls(self):
         """Clear call history."""
         self.calls = []
-    
+
     def reset(self):
         """Reset all state."""
         self._tabs.clear()
@@ -352,22 +368,23 @@ class MockCamofoxClient:
 # Mock Rate Limiter
 # =============================================================================
 
+
 class MockRateLimiter:
     """
     Mock RateLimiter for testing.
-    
+
     Configure to allow/deny specific accounts:
-    
+
         mock = MockRateLimiter()
         mock.denied_accounts = {5, 10, 15}  # Account IDs to deny
     """
-    
+
     def __init__(self):
         self.denied_accounts: set[int] = set()
         self.denied_reasons: dict[int, str] = {}
         self.check_count = 0
         self.vote_record_count = 0
-        
+
     def check(self, account, db) -> tuple[bool, str]:
         """Check if account is rate limited."""
         self.check_count += 1
@@ -375,14 +392,14 @@ class MockRateLimiter:
             reason = self.denied_reasons.get(account.id, "rate_limit_exceeded")
             return False, reason
         return True, ""
-    
+
     def record_vote(self, account, db) -> None:
         """Record a vote for account."""
         self.vote_record_count += 1
-    
+
     def get_stats(self, account) -> dict:
         return {"votes_today": 0, "votes_this_week": 0}
-    
+
     def reset(self):
         self.denied_accounts.clear()
         self.denied_reasons.clear()
@@ -393,6 +410,7 @@ class MockRateLimiter:
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_camofox():
@@ -410,6 +428,7 @@ def mock_rate_limiter():
 def rate_limit_config():
     """Set up test config overrides for rate limiting."""
     from app.modules.shared.config import get_config
+
     config = get_config()
 
     overrides = {
@@ -431,6 +450,7 @@ def rate_limit_config():
 def real_rate_limiter(rate_limit_config):
     """Create a real RateLimiter with test config."""
     from app.modules.executor.rate_limiter import RateLimiter
+
     return RateLimiter()
 
 
@@ -438,7 +458,7 @@ def real_rate_limiter(rate_limit_config):
 def fresh_account(db_session):
     """Create a single fresh account."""
     from app.models import Account, AccountStatus, AccountType
-    
+
     account = Account(
         username="testuser1",
         password="testpass123",
@@ -456,7 +476,7 @@ def fresh_account(db_session):
 def logged_in_account(db_session):
     """Create a single logged-in account."""
     from app.models import Account, AccountStatus, AccountType
-    
+
     account = Account(
         username="loggedin1",
         password="testpass123",
@@ -473,7 +493,7 @@ def logged_in_account(db_session):
 def fifty_accounts(db_session):
     """Create 50 logged-in accounts."""
     from app.models import Account, AccountStatus, AccountType
-    
+
     accounts = []
     for i in range(1, 51):
         account = Account(
@@ -486,11 +506,11 @@ def fifty_accounts(db_session):
         )
         db_session.add(account)
         accounts.append(account)
-    
+
     db_session.commit()
     for acc in accounts:
         db_session.refresh(acc)
-    
+
     return accounts
 
 
@@ -498,7 +518,7 @@ def fifty_accounts(db_session):
 def queued_task(db_session, fifty_accounts):
     """Create a task with workers_needed=10 using the fifty_accounts fixture."""
     from app.models import Task, TaskStatus
-    
+
     task = Task(
         action_type="upvote_post",
         target_url="https://old.reddit.com/r/test/comments/abc123/",
@@ -515,7 +535,7 @@ def queued_task(db_session, fifty_accounts):
 def queued_task_noaccounts(db_session):
     """Create an empty queued task with no accounts."""
     from app.models import Task, TaskStatus
-    
+
     task = Task(
         action_type="upvote_post",
         target_url="https://old.reddit.com/r/test/comments/abc123/",
@@ -532,7 +552,7 @@ def queued_task_noaccounts(db_session):
 def running_task(db_session, fifty_accounts):
     """Create a running task."""
     from app.models import Task, TaskStatus
-    
+
     task = Task(
         action_type="upvote_post",
         target_url="https://old.reddit.com/r/test/comments/abc123/",
@@ -550,7 +570,7 @@ def running_task(db_session, fifty_accounts):
 def completed_task(db_session, fifty_accounts):
     """Create a completed task."""
     from app.models import Task, TaskStatus
-    
+
     task = Task(
         action_type="upvote_post",
         target_url="https://old.reddit.com/r/test/comments/abc123/",
@@ -570,12 +590,13 @@ def completed_task(db_session, fifty_accounts):
 def processor(db_session, mock_camofox, mock_rate_limiter):
     """Create a QueueProcessor with mocked dependencies."""
     from app.modules.queue.processor import QueueProcessor
-    
+
     proc = QueueProcessor.__new__(QueueProcessor)
     proc._session_factory = db_session.get_bind().__class__
     proc.camofox = mock_camofox
     proc.rate_limiter = mock_rate_limiter
     from app.config import get_settings
+
     settings = get_settings()
     proc.max_concurrent = getattr(settings, "max_concurrent_per_task", 3)
     proc.max_retries = 3
@@ -586,15 +607,15 @@ def processor(db_session, mock_camofox, mock_rate_limiter):
     proc._in_flight_lock = threading.Lock()
     proc._thread = None
     proc._loop_errors = 0
-    
+
     from sqlalchemy.orm import sessionmaker
     from app.models import Base
-    
+
     engine = db_session.get_bind()
     SessionFactory = sessionmaker(bind=engine)
-    
+
     proc._session_factory = SessionFactory
-    
+
     return proc
 
 
@@ -618,6 +639,10 @@ def all_action_types():
 def sample_account_data():
     """Sample account data for import tests."""
     return [
-        {"username": f"user_{i}", "password": f"pass_{i}", "email": f"user_{i}@example.com"}
+        {
+            "username": f"user_{i}",
+            "password": f"pass_{i}",
+            "email": f"user_{i}@example.com",
+        }
         for i in range(1, 51)
     ]

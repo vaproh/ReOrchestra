@@ -19,9 +19,15 @@ class RateLimiter:
         if account.status.value in ("dead", "banned"):
             return False, f"account_{account.status.value}"
 
-        max_votes_per_day = self.config.get("rate_limits", "max_votes_per_day", default=15)
-        max_votes_per_week = self.config.get("rate_limits", "max_votes_per_week", default=100)
-        min_seconds_between = self.config.get("rate_limits", "min_seconds_between_votes", default=120)
+        max_votes_per_day = self.config.get(
+            "rate_limits", "max_votes_per_day", default=15
+        )
+        max_votes_per_week = self.config.get(
+            "rate_limits", "max_votes_per_week", default=100
+        )
+        min_seconds_between = self.config.get(
+            "rate_limits", "min_seconds_between_votes", default=120
+        )
 
         if account.votes_today >= max_votes_per_day:
             return False, "daily_limit_reached"
@@ -49,25 +55,39 @@ class RateLimiter:
         return account.active_hours_start <= current_hour <= account.active_hours_end
 
     def _vote_ratio_too_high(self, account: Account, db: Session) -> bool:
-        max_vote_ratio = self.config.get("rate_limits", "max_vote_only_ratio", default=0.3)
+        max_vote_ratio = self.config.get(
+            "rate_limits", "max_vote_only_ratio", default=0.3
+        )
 
         week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-        total_actions = db.query(TaskExecutionLog).filter(
-            TaskExecutionLog.account_id == account.id,
-            TaskExecutionLog.created_at >= week_ago,
-        ).count()
+        total_actions = (
+            db.query(TaskExecutionLog)
+            .filter(
+                TaskExecutionLog.account_id == account.id,
+                TaskExecutionLog.created_at >= week_ago,
+            )
+            .count()
+        )
 
         if total_actions == 0:
             return False
 
-        vote_actions = db.query(TaskExecutionLog).filter(
-            TaskExecutionLog.account_id == account.id,
-            TaskExecutionLog.action_type.in_([
-                "upvote_post", "downvote_post",
-                "upvote_comment", "downvote_comment",
-            ]),
-            TaskExecutionLog.created_at >= week_ago,
-        ).count()
+        vote_actions = (
+            db.query(TaskExecutionLog)
+            .filter(
+                TaskExecutionLog.account_id == account.id,
+                TaskExecutionLog.action_type.in_(
+                    [
+                        "upvote_post",
+                        "downvote_post",
+                        "upvote_comment",
+                        "downvote_comment",
+                    ]
+                ),
+                TaskExecutionLog.created_at >= week_ago,
+            )
+            .count()
+        )
 
         vote_ratio = vote_actions / total_actions if total_actions > 0 else 0
         return vote_ratio > max_vote_ratio
@@ -101,7 +121,8 @@ class RateLimiter:
         return {
             "votes_today": account.votes_today,
             "votes_this_week": account.votes_this_week,
-            "last_vote_at": account.last_vote_at.isoformat() if account.last_vote_at else None,
+            "last_vote_at": account.last_vote_at.isoformat()
+            if account.last_vote_at
+            else None,
             "active_hours": f"{account.active_hours_start}-{account.active_hours_end}",
         }
-

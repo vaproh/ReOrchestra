@@ -1,6 +1,7 @@
 """
 Centralized logging setup for ReOrchestra.
 """
+
 import os
 import sys
 import logging
@@ -18,7 +19,7 @@ def setup_logging(level: int = logging.DEBUG) -> None:
     console_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
     console_level = getattr(logging, console_level_str, logging.INFO)
 
-    timestamp = __import__('time').strftime("%Y%m%d_%H%M%S")
+    timestamp = __import__("time").strftime("%Y%m%d_%H%M%S")
     LOG_FILE = LOG_DIR / f"app_{timestamp}.log"
 
     root_logger = logging.getLogger()
@@ -32,7 +33,9 @@ def setup_logging(level: int = logging.DEBUG) -> None:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=10*1024*1024, backupCount=5)
+    file_handler = RotatingFileHandler(
+        LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5
+    )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 

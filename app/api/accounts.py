@@ -7,9 +7,18 @@ import logging
 from app.database import get_db, Account, AccountStatus, AccountType
 
 ACCOUNT_SORT_COLUMNS = {
-    "id", "username", "status", "account_type", "karma_total",
-    "karma_post", "karma_comment", "fail_count", "last_used",
-    "last_login", "created_at", "email_verified",
+    "id",
+    "username",
+    "status",
+    "account_type",
+    "karma_total",
+    "karma_post",
+    "karma_comment",
+    "fail_count",
+    "last_used",
+    "last_login",
+    "created_at",
+    "email_verified",
 }
 
 logger = logging.getLogger("accounts")
@@ -34,7 +43,9 @@ def session_valid(username: str) -> tuple[bool, float | None]:
     session_path = os.path.join(settings.session_dir, f"{username}.cookies")
     if not os.path.exists(session_path):
         return False, None
-    age_hours = (datetime.now(UTC) - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
+    age_hours = (
+        datetime.now(UTC) - datetime.fromtimestamp(os.path.getmtime(session_path))
+    ).total_seconds() / 3600
     return age_hours < settings.max_session_age_hours, age_hours
 
 
@@ -48,10 +59,14 @@ async def import_accounts(
     errors = []
 
     for acc_data in request.accounts:
-        existing = db.query(Account).filter(Account.username == acc_data.username).first()
+        existing = (
+            db.query(Account).filter(Account.username == acc_data.username).first()
+        )
         if existing:
             logger.debug(f"Import skip: {acc_data.username} exists")
-            errors.append({"username": acc_data.username, "error": "Username already exists"})
+            errors.append(
+                {"username": acc_data.username, "error": "Username already exists"}
+            )
             continue
 
         account = Account(
@@ -70,12 +85,17 @@ async def import_accounts(
     db.flush()
     logger.info("Imported %s accounts, %s skipped", len(imported), len(errors))
 
-    return SuccessResponse(data={
-        "imported": len(imported),
-        "skipped": len(errors),
-        "accounts": [{"id": a.id, "username": a.username, "status": a.status.value} for a in imported],
-        "errors": errors,
-    })
+    return SuccessResponse(
+        data={
+            "imported": len(imported),
+            "skipped": len(errors),
+            "accounts": [
+                {"id": a.id, "username": a.username, "status": a.status.value}
+                for a in imported
+            ],
+            "errors": errors,
+        }
+    )
 
 
 @router.get("", response_model=SuccessResponse)
@@ -93,7 +113,9 @@ async def list_accounts(
 
     if status:
         if status == "alive":
-            query = query.filter(Account.status.in_([AccountStatus.fresh, AccountStatus.logged_in]))
+            query = query.filter(
+                Account.status.in_([AccountStatus.fresh, AccountStatus.logged_in])
+            )
         else:
             try:
                 query = query.filter(Account.status == AccountStatus[status])
@@ -103,28 +125,36 @@ async def list_accounts(
         try:
             query = query.filter(Account.account_type == AccountType[account_type])
         except KeyError:
-            raise HTTPException(status_code=400, detail=f"Invalid account type: {account_type}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid account type: {account_type}"
+            )
     if search:
         query = query.filter(Account.username.contains(search))
 
     total = query.count()
     if sort not in ACCOUNT_SORT_COLUMNS:
         raise HTTPException(status_code=400, detail=f"Invalid sort column: {sort}")
-    query = query.order_by(getattr(Account, sort).asc() if order == "asc" else getattr(Account, sort).desc())
+    query = query.order_by(
+        getattr(Account, sort).asc()
+        if order == "asc"
+        else getattr(Account, sort).desc()
+    )
     accounts = query.offset((page - 1) * per_page).limit(per_page).all()
 
-    return SuccessResponse(data={
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "accounts": [
-            {
-                **AccountResponse.model_validate(a).model_dump(),
-                "session_valid": session_valid(a.username)[0],
-            }
-            for a in accounts
-        ],
-    })
+    return SuccessResponse(
+        data={
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "accounts": [
+                {
+                    **AccountResponse.model_validate(a).model_dump(),
+                    "session_valid": session_valid(a.username)[0],
+                }
+                for a in accounts
+            ],
+        }
+    )
 
 
 @router.get("/{account_id}", response_model=SuccessResponse)
@@ -137,34 +167,52 @@ async def get_account(
         raise HTTPException(status_code=404, detail="Account not found")
 
     is_valid, age_hours = session_valid(account.username)
-    recent = db.query(TaskExecutionLog).filter(
-        TaskExecutionLog.account_id == account_id
-    ).order_by(TaskExecutionLog.created_at.desc()).limit(10).all()
+    recent = (
+        db.query(TaskExecutionLog)
+        .filter(TaskExecutionLog.account_id == account_id)
+        .order_by(TaskExecutionLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
 
-    return SuccessResponse(data={
-        **AccountDetailResponse(
-            id=account.id,
-            username=account.username,
-            password=account.password,
-            status=account.status.value,
-            account_type=account.account_type.value,
-            karma_total=account.karma_total,
-            karma_post=account.karma_post,
-            karma_comment=account.karma_comment,
-            email=account.email,
-            email_verified=account.email_verified,
-            proxy=account.proxy,
-            profile_id=account.profile_id,
-            cookies_present=os.path.exists(os.path.join(get_settings().session_dir, f"{account.username}.cookies")),
-            session_valid=is_valid,
-            session_age_hours=age_hours,
-            last_used=account.last_used,
-            last_login=account.last_login,
-            fail_count=account.fail_count,
-            created_at=account.created_at,
-            recent_actions=[{"action": a.action_type, "target_url": a.target_url, "success": a.success, "created_at": a.created_at.isoformat()} for a in recent],
-        ).model_dump(),
-    })
+    return SuccessResponse(
+        data={
+            **AccountDetailResponse(
+                id=account.id,
+                username=account.username,
+                password=account.password,
+                status=account.status.value,
+                account_type=account.account_type.value,
+                karma_total=account.karma_total,
+                karma_post=account.karma_post,
+                karma_comment=account.karma_comment,
+                email=account.email,
+                email_verified=account.email_verified,
+                proxy=account.proxy,
+                profile_id=account.profile_id,
+                cookies_present=os.path.exists(
+                    os.path.join(
+                        get_settings().session_dir, f"{account.username}.cookies"
+                    )
+                ),
+                session_valid=is_valid,
+                session_age_hours=age_hours,
+                last_used=account.last_used,
+                last_login=account.last_login,
+                fail_count=account.fail_count,
+                created_at=account.created_at,
+                recent_actions=[
+                    {
+                        "action": a.action_type,
+                        "target_url": a.target_url,
+                        "success": a.success,
+                        "created_at": a.created_at.isoformat(),
+                    }
+                    for a in recent
+                ],
+            ).model_dump(),
+        }
+    )
 
 
 @router.patch("/{account_id}", response_model=SuccessResponse)
@@ -183,12 +231,16 @@ async def update_account(
                 try:
                     setattr(account, key, AccountStatus[value])
                 except KeyError:
-                    raise HTTPException(status_code=400, detail=f"Invalid status: {value}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid status: {value}"
+                    )
             elif key == "account_type" and value:
                 try:
                     setattr(account, key, AccountType[value])
                 except KeyError:
-                    raise HTTPException(status_code=400, detail=f"Invalid account type: {value}")
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid account type: {value}"
+                    )
             else:
                 setattr(account, key, value)
 
@@ -209,7 +261,9 @@ async def delete_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    session_path = os.path.join(get_settings().session_dir, f"{account.username}.cookies")
+    session_path = os.path.join(
+        get_settings().session_dir, f"{account.username}.cookies"
+    )
     if os.path.exists(session_path):
         os.remove(session_path)
 
@@ -229,25 +283,39 @@ async def batch_delete_accounts(
     query = db.query(Account)
 
     if not request.ids and not request.filters:
-        raise HTTPException(status_code=400, detail="Either 'ids' or 'filters' must be provided")
+        raise HTTPException(
+            status_code=400, detail="Either 'ids' or 'filters' must be provided"
+        )
 
     if request.ids:
         query = query.filter(Account.id.in_(request.ids))
     elif request.filters:
         if "status" in request.filters:
             try:
-                query = query.filter(Account.status == AccountStatus[request.filters["status"]])
+                query = query.filter(
+                    Account.status == AccountStatus[request.filters["status"]]
+                )
             except KeyError:
-                raise HTTPException(status_code=400, detail=f"Invalid status: {request.filters['status']}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status: {request.filters['status']}",
+                )
         if "type" in request.filters:
             try:
-                query = query.filter(Account.account_type == AccountType[request.filters["type"]])
+                query = query.filter(
+                    Account.account_type == AccountType[request.filters["type"]]
+                )
             except KeyError:
-                raise HTTPException(status_code=400, detail=f"Invalid account type: {request.filters['type']}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid account type: {request.filters['type']}",
+                )
 
     accounts = query.all()
     for account in accounts:
-        session_path = os.path.join(get_settings().session_dir, f"{account.username}.cookies")
+        session_path = os.path.join(
+            get_settings().session_dir, f"{account.username}.cookies"
+        )
         if os.path.exists(session_path):
             os.remove(session_path)
         db.delete(account)
@@ -282,26 +350,44 @@ async def login_accounts(
                 proxy=account.proxy,
                 profile_id=account.profile_id,
                 force=request.force,
-                headless=request.options.get("headless", False) if request.options else False,
+                headless=request.options.get("headless", False)
+                if request.options
+                else False,
             )
             if success:
                 account.status = AccountStatus.logged_in
                 account.last_login = datetime.now(UTC)
                 db.commit()
                 logger.info(f"Login success: {account.username}")
-            results.append({"account_id": account.id, "username": account.username, "success": success, "time_ms": time_ms})
+            results.append(
+                {
+                    "account_id": account.id,
+                    "username": account.username,
+                    "success": success,
+                    "time_ms": time_ms,
+                }
+            )
         except Exception as e:
             logger.error(f"Login failed: {account.username} - {e}")
-            results.append({"account_id": account.id, "username": account.username, "success": False, "error": str(e)})
+            results.append(
+                {
+                    "account_id": account.id,
+                    "username": account.username,
+                    "success": False,
+                    "error": str(e),
+                }
+            )
 
     succeeded = len([r for r in results if r.get("success")])
     logger.info(f"Login complete: {succeeded}/{len(accounts)} succeeded")
-    return SuccessResponse(data={
-        "total": len(accounts),
-        "logged_in": succeeded,
-        "failed": len(results) - succeeded,
-        "results": results,
-    })
+    return SuccessResponse(
+        data={
+            "total": len(accounts),
+            "logged_in": succeeded,
+            "failed": len(results) - succeeded,
+            "results": results,
+        }
+    )
 
 
 @router.post("/login/simple", response_model=SuccessResponse)
@@ -327,11 +413,13 @@ async def login_simple(
         headless=headless,
     )
 
-    return SuccessResponse(data={
-        "success": success,
-        "username": username,
-        "time_ms": time_ms,
-    })
+    return SuccessResponse(
+        data={
+            "success": success,
+            "username": username,
+            "time_ms": time_ms,
+        }
+    )
 
 
 @router.post("/login/batch", response_model=SuccessResponse)
@@ -343,20 +431,30 @@ async def batch_login_accounts(
 
     if request.filters.get("status"):
         try:
-            query = query.filter(Account.status == AccountStatus[request.filters["status"]])
+            query = query.filter(
+                Account.status == AccountStatus[request.filters["status"]]
+            )
         except KeyError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {request.filters['status']}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid status: {request.filters['status']}"
+            )
     if request.filters.get("type"):
         try:
-            query = query.filter(Account.account_type == AccountType[request.filters["type"]])
+            query = query.filter(
+                Account.account_type == AccountType[request.filters["type"]]
+            )
         except KeyError:
-            raise HTTPException(status_code=400, detail=f"Invalid account type: {request.filters['type']}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid account type: {request.filters['type']}",
+            )
 
     accounts = query.all()
     if not accounts:
         raise HTTPException(status_code=404, detail="No accounts found")
 
     from app.modules.accounts.login import LoginService
+
     service = LoginService()
     results = []
 
@@ -368,23 +466,41 @@ async def batch_login_accounts(
                 proxy=account.proxy,
                 profile_id=account.profile_id,
                 force=request.force,
-                headless=request.options.get("headless", False) if request.options else False,
+                headless=request.options.get("headless", False)
+                if request.options
+                else False,
             )
             if success:
                 account.status = AccountStatus.logged_in
                 account.last_login = datetime.now(UTC)
                 db.commit()
-            results.append({"account_id": account.id, "username": account.username, "success": success, "time_ms": time_ms})
+            results.append(
+                {
+                    "account_id": account.id,
+                    "username": account.username,
+                    "success": success,
+                    "time_ms": time_ms,
+                }
+            )
         except Exception as e:
-            results.append({"account_id": account.id, "username": account.username, "success": False, "error": str(e)})
+            results.append(
+                {
+                    "account_id": account.id,
+                    "username": account.username,
+                    "success": False,
+                    "error": str(e),
+                }
+            )
 
     succeeded = len([r for r in results if r.get("success")])
-    return SuccessResponse(data={
-        "total": len(accounts),
-        "logged_in": succeeded,
-        "failed": len(results) - succeeded,
-        "results": results,
-    })
+    return SuccessResponse(
+        data={
+            "total": len(accounts),
+            "logged_in": succeeded,
+            "failed": len(results) - succeeded,
+            "results": results,
+        }
+    )
 
 
 @router.get("/{account_id}/session", response_model=SuccessResponse)
@@ -398,14 +514,24 @@ async def check_session(
 
     is_valid, age_hours = session_valid(account.username)
     settings = get_settings()
-    expires_in = max(0, settings.max_session_age_hours - age_hours) if age_hours else settings.max_session_age_hours
+    expires_in = (
+        max(0, settings.max_session_age_hours - age_hours)
+        if age_hours
+        else settings.max_session_age_hours
+    )
 
-    return SuccessResponse(data={
-        "account_id": account.id,
-        "username": account.username,
-        "session_valid": is_valid,
-        "session_age_hours": round(age_hours, 2) if age_hours else None,
-        "expires_in_hours": round(expires_in, 2),
-        "cookies_exist": os.path.exists(os.path.join(settings.session_dir, f"{account.username}.cookies")),
-        "last_login": account.last_login.isoformat() if account.last_login else None,
-    })
+    return SuccessResponse(
+        data={
+            "account_id": account.id,
+            "username": account.username,
+            "session_valid": is_valid,
+            "session_age_hours": round(age_hours, 2) if age_hours else None,
+            "expires_in_hours": round(expires_in, 2),
+            "cookies_exist": os.path.exists(
+                os.path.join(settings.session_dir, f"{account.username}.cookies")
+            ),
+            "last_login": account.last_login.isoformat()
+            if account.last_login
+            else None,
+        }
+    )

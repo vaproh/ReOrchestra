@@ -41,7 +41,9 @@ def _task_dict(t: Task) -> dict:
 
 @router.get("", response_model=SuccessResponse)
 async def list_tasks(
-    status: str = Query(None, description="queued, running, completed, partial, failed, cancelled"),
+    status: str = Query(
+        None, description="queued, running, completed, partial, failed, cancelled"
+    ),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -51,15 +53,25 @@ async def list_tasks(
         try:
             q = q.filter(Task.status == TaskStatus(status))
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in TaskStatus]}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Valid: {[s.value for s in TaskStatus]}",
+            )
     total = q.count()
-    tasks = q.order_by(Task.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
-    return SuccessResponse(data={
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "tasks": [_task_dict(t) for t in tasks],
-    })
+    tasks = (
+        q.order_by(Task.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+    return SuccessResponse(
+        data={
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "tasks": [_task_dict(t) for t in tasks],
+        }
+    )
 
 
 @router.post("", response_model=SuccessResponse)
@@ -72,13 +84,19 @@ async def create_task(request: TaskCreateRequest, db: Session = Depends(get_db))
     if not action_type:
         raise HTTPException(status_code=400, detail="action_type required")
     if action_type not in ACTION_TYPES:
-        raise HTTPException(status_code=400, detail=f"Invalid action_type. Valid: {ACTION_TYPES}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid action_type. Valid: {ACTION_TYPES}"
+        )
     if not target_url:
         raise HTTPException(status_code=400, detail="target_url required")
     if not isinstance(workers_needed, int) or workers_needed < 1:
-        raise HTTPException(status_code=400, detail="workers_needed must be a positive integer")
+        raise HTTPException(
+            status_code=400, detail="workers_needed must be a positive integer"
+        )
 
-    logger.info(f"Creating task: {action_type} on {target_url} with {workers_needed} workers")
+    logger.info(
+        f"Creating task: {action_type} on {target_url} with {workers_needed} workers"
+    )
 
     task = Task(
         action_type=action_type,
@@ -97,12 +115,14 @@ async def create_task(request: TaskCreateRequest, db: Session = Depends(get_db))
         .count()
     )
 
-    return SuccessResponse(data={
-        "task_id": task.id,
-        "status": task.status.value,
-        "queue_position": queue_pos,
-        "workers_needed": task.workers_needed,
-    })
+    return SuccessResponse(
+        data={
+            "task_id": task.id,
+            "status": task.status.value,
+            "queue_position": queue_pos,
+            "workers_needed": task.workers_needed,
+        }
+    )
 
 
 @router.get("/{task_id}", response_model=SuccessResponse)
@@ -138,6 +158,7 @@ async def get_task(task_id: int, db: Session = Depends(get_db)):
 @router.post("/{task_id}/cancel", response_model=SuccessResponse)
 async def cancel_task(task_id: int, db: Session = Depends(get_db)):
     from app.modules.queue import QueueManager
+
     manager = QueueManager.get()
     processor = manager.processor
 
@@ -146,7 +167,9 @@ async def cancel_task(task_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     if task.status in (TaskStatus.completed, TaskStatus.cancelled):
-        return SuccessResponse(data={"status": task.status.value, "message": "Task already finished"})
+        return SuccessResponse(
+            data={"status": task.status.value, "message": "Task already finished"}
+        )
 
     task.status = TaskStatus.cancelled
     task.completed_at = datetime.now(UTC)
@@ -159,7 +182,9 @@ async def cancel_task(task_id: int, db: Session = Depends(get_db)):
 
     db.commit()
     logger.info("Cancel task %s", task_id)
-    return SuccessResponse(data={"status": task.status.value, "message": "Task cancelled"})
+    return SuccessResponse(
+        data={"status": task.status.value, "message": "Task cancelled"}
+    )
 
 
 @router.post("/{task_id}/priority", response_model=SuccessResponse)
@@ -184,7 +209,7 @@ async def retry_task(task_id: int, db: Session = Depends(get_db)):
     if task.status not in (TaskStatus.failed, TaskStatus.partial, TaskStatus.cancelled):
         raise HTTPException(
             status_code=400,
-            detail=f"Task cannot be retried (status: {task.status.value})"
+            detail=f"Task cannot be retried (status: {task.status.value})",
         )
 
     task.status = TaskStatus.queued

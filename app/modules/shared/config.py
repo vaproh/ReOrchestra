@@ -35,7 +35,11 @@ class ConfigService:
             return yaml.safe_load(f) or {}
 
     def get(self, *keys: str, default: Any = None) -> Any:
-        for source in [self._runtime_overrides, self._custom_config, self._default_config]:
+        for source in [
+            self._runtime_overrides,
+            self._custom_config,
+            self._default_config,
+        ]:
             value = source
             for key in keys:
                 if isinstance(value, dict):
