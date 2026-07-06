@@ -44,11 +44,11 @@ class QueueManager:
             self._processor.start()
             logger.info("queue_manager | start | processor_started")
 
-    def stop(self):
-        logger.debug("QueueManager.stop() called")
+    def stop(self, graceful: bool = False, timeout: float = 300):
+        logger.debug(f"QueueManager.stop() called (graceful={graceful})")
         with self._lock:
             if self._processor:
-                self._processor.stop()
+                self._processor.stop(graceful=graceful, timeout=timeout)
                 self._processor = None
                 logger.info("queue_manager | stop | processor_stopped")
 

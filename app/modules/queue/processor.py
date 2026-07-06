@@ -76,8 +76,10 @@ class QueueProcessor:
         self.max_retries: int = 3
 
         self._stop_event = threading.Event()
-        # Maps task_id → Event; set to signal that task should abort
+        self._graceful_shutdown = False
         self._cancel_events: dict[int, threading.Event] = {}
+        self._in_flight = 0
+        self._in_flight_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._loop_errors = 0
 
@@ -155,9 +157,23 @@ class QueueProcessor:
         self._thread.start()
         logger.info("queue | processor_start")
 
-    def stop(self, timeout: float = 300):
-        logger.info("QueueProcessor stopped")
+    def stop(self, timeout: float = 300, graceful: bool = False):
+        logger.info(f"QueueProcessor stop requested (graceful={graceful})")
+        self._graceful_shutdown = graceful
         self._stop_event.set()
+        if graceful:
+            with self._in_flight_lock:
+                in_flight = self._in_flight
+            if in_flight > 0:
+                logger.info(f"queue | graceful_shutdown | waiting for {in_flight} in-flight workers")
+            start_time = time.time()
+            while self._in_flight > 0:
+                time.sleep(0.1)
+                if time.time() - start_time > timeout:
+                    logger.warning("queue | graceful_shutdown | timeout exceeded")
+                    break
+            elapsed = time.time() - start_time
+            logger.info(f"queue | graceful_shutdown | waited {elapsed:.1f}s for in-flight workers")
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
             if self._thread.is_alive():
@@ -227,7 +243,7 @@ class QueueProcessor:
         Inner loop: keep assigning accounts and executing until either
         workers_completed reaches workers_needed, or no eligible accounts remain.
         """
-        while not cancel_event.is_set():
+        while not cancel_event.is_set() and not self._graceful_shutdown:
             db.refresh(task)
             if task.workers_completed >= task.workers_needed:
                 break
@@ -288,6 +304,9 @@ class QueueProcessor:
         target_url = task.target_url
 
         def run_one(account_id: int) -> tuple[int, dict]:
+            nonlocal self
+            with self._in_flight_lock:
+                self._in_flight += 1
             thread_db = self._session_factory()
             try:
                 account = thread_db.query(Account).filter(Account.id == account_id).first()
@@ -297,7 +316,10 @@ class QueueProcessor:
                                         "error": "Account or task not found",
                                         "attempts": 0, "duration_ms": 0}
 
-                # Rate-limit check for vote actions
+                if cancel_event.is_set():
+                    return account_id, {"success": False, "outcome": "cancelled",
+                                        "error": "Task cancelled", "attempts": 0, "duration_ms": 0}
+
                 if action_type in VOTE_ACTIONS:
                     allowed, reason = self.rate_limiter.check(account, thread_db)
                     if not allowed:
@@ -309,7 +331,6 @@ class QueueProcessor:
                     account, task_obj, cancel_event, thread_db
                 )
 
-                # Record vote in rate limiter on success
                 if result["success"] and action_type in VOTE_ACTIONS:
                     self.rate_limiter.record_vote(account, thread_db)
 
@@ -320,6 +341,8 @@ class QueueProcessor:
                                     "error": str(e), "attempts": 0, "duration_ms": 0}
             finally:
                 thread_db.close()
+                with self._in_flight_lock:
+                    self._in_flight -= 1
 
         max_workers = min(len(accounts), self.max_concurrent)
         results: list[tuple[int, dict]] = []
@@ -351,7 +374,7 @@ class QueueProcessor:
                     "error": f"Unknown action: {task.action_type}",
                     "attempts": 0, "duration_ms": 0}
 
-        action = action_cls(self.camofox)
+        action = action_cls(self.camofox, cancel_event)
         last_result = None
 
         for attempt in range(1, self.max_retries + 1):

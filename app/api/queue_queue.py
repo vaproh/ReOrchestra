@@ -57,11 +57,11 @@ async def start_queue():
 
 
 @router.post("/stop", response_model=SuccessResponse)
-async def stop_queue():
-    logger.info("Queue stop requested")
+async def stop_queue(graceful: bool = False):
+    logger.info(f"Queue stop requested (graceful={graceful})")
     manager = QueueManager.get()
     try:
-        manager.stop()
+        manager.stop(graceful=graceful)
     except Exception as e:
         logger.error("Queue stop failed | error=%s", e)
     return SuccessResponse(data={"processing": False})

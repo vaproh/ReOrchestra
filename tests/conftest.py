@@ -580,18 +580,19 @@ def processor(db_session, mock_camofox, mock_rate_limiter):
     proc.max_concurrent = getattr(settings, "max_concurrent_per_task", 3)
     proc.max_retries = 3
     proc._stop_event = threading.Event()
+    proc._graceful_shutdown = False
     proc._cancel_events = {}
+    proc._in_flight = 0
+    proc._in_flight_lock = threading.Lock()
     proc._thread = None
     proc._loop_errors = 0
     
-    # Create a proper session factory
     from sqlalchemy.orm import sessionmaker
     from app.models import Base
     
     engine = db_session.get_bind()
     SessionFactory = sessionmaker(bind=engine)
     
-    # Override the session factory
     proc._session_factory = SessionFactory
     
     return proc

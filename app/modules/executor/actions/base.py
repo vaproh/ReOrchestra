@@ -48,8 +48,12 @@ class BaseAction:
     # e.g. r'button\s+"upvote"\s+\[e(\d+)\]'
     target_pattern: str = ""
 
-    def __init__(self, camofox: CamofoxClient):
+    def __init__(self, camofox: CamofoxClient, cancel_event=None):
         self.camofox = camofox
+        self._cancel_event = cancel_event
+
+    def _is_cancelled(self) -> bool:
+        return self._cancel_event is not None and self._cancel_event.is_set()
 
     # ------------------------------------------------------------------
     # URL helpers
@@ -133,7 +137,7 @@ class BaseAction:
     # Core execution flow
     # ------------------------------------------------------------------
 
-    def execute(self, account, target_url: str) -> ActionResult:
+    def execute(self, account, target_url: str, cancel_event=None) -> ActionResult:
         """
         Default execution flow:
         1. Open tab & navigate
@@ -146,19 +150,42 @@ class BaseAction:
         started = time.time()
         tab: Optional[Tab] = None
         try:
+            if cancel_event is not None and cancel_event.is_set():
+                return ActionResult(
+                    success=False,
+                    outcome="cancelled",
+                    error="Task cancelled before execution",
+                    duration_ms=int((time.time() - started) * 1000),
+                )
+
             url = self.normalize_url(target_url)
             session_key = f"wq_{account.id}_{self.action_type}"
             user_id = f"s_{account.id}"
 
-            # Set on client BEFORE create_tab so the Tab gets correct user_id/session_key
             self.camofox.user_id = user_id
             self.camofox.session_key = session_key
             tab = self.camofox.create_tab(url=url)
+
+            if cancel_event is not None and cancel_event.is_set():
+                return ActionResult(
+                    success=False,
+                    outcome="cancelled",
+                    error="Task cancelled after tab creation",
+                    duration_ms=int((time.time() - started) * 1000),
+                )
+
             self.camofox.wait(tab)
+
+            if cancel_event is not None and cancel_event.is_set():
+                return ActionResult(
+                    success=False,
+                    outcome="cancelled",
+                    error="Task cancelled during wait",
+                    duration_ms=int((time.time() - started) * 1000),
+                )
 
             snapshot, current_url = self.camofox.snapshot_quick(tab)
 
-            # For non-vote actions (follow/unfollow/join/leave/save): check banner BEFORE clicking
             banner = self.action_blocked_by_banner(snapshot)
             if banner:
                 return ActionResult(
@@ -178,7 +205,24 @@ class BaseAction:
                 )
 
             self.camofox.click(tab, ref)
+
+            if cancel_event is not None and cancel_event.is_set():
+                return ActionResult(
+                    success=False,
+                    outcome="cancelled",
+                    error="Task cancelled during click",
+                    duration_ms=int((time.time() - started) * 1000),
+                )
+
             self.camofox.wait(tab, timeout=get_settings().post_click_wait_ms)
+
+            if cancel_event is not None and cancel_event.is_set():
+                return ActionResult(
+                    success=False,
+                    outcome="cancelled",
+                    error="Task cancelled during post-click wait",
+                    duration_ms=int((time.time() - started) * 1000),
+                )
 
             after_snapshot, _ = self.camofox.snapshot_quick(tab)
             verify_ok, verify_error = self.verify_success(after_snapshot)
