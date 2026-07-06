@@ -1,5 +1,19 @@
 # Prompt for Antigravity AI
 
+## IMPORTANT: Read FRONTEND_SPEC.md First
+
+Before starting, read **`FRONTEND_SPEC.md`** - it is the **source of truth** for:
+- Complete API endpoints with query parameters
+- Response formats
+- HTMX patterns
+- Component examples
+- Color scheme and styling
+- All details about each page
+
+This prompt is a summary. The spec has everything.
+
+---
+
 ## Build the ReOrchestra Frontend
 
 Build a complete web dashboard for ReOrchestra using **HTMX + Jinja2 + Tailwind CSS + Flowbite**.
@@ -173,13 +187,14 @@ POST   /api/proxies/mark-dead          # Mark dead
 
 ## Important Guidelines
 
-1. **Pure HTML + Tailwind + Flowbite + HTMX** - No JavaScript frameworks
-2. **Use Flowbite components** - Modals, tables, navbar, cards, badges, toasts
-3. **HTMX for all interactivity** - Forms, refresh, delete, swap
-4. **Backend already exists** - Just build the HTML templates
-5. **Use Jinja2 syntax** - `{{ variable }}`, `{% for %}`, `{% if %}`
-6. **Plan swap targets** - Which elements get updated via HTMX
-7. **Test against existing API** - API is fully functional
+1. **Read FRONTEND_SPEC.md first** - It is the source of truth
+2. **Pure HTML + Tailwind + Flowbite + HTMX** - No JavaScript frameworks
+3. **Use Flowbite components** - Modals, tables, navbar, cards, badges, toasts
+4. **HTMX for all interactivity** - Forms, refresh, delete, swap
+5. **Backend already exists** - Just build the HTML templates
+6. **Use Jinja2 syntax** - `{{ variable }}`, `{% for %}`, `{% if %}`
+7. **Plan swap targets** - Which elements get updated via HTMX
+8. **Test against existing API** - API is fully functional
 
 ---
 
@@ -242,5 +257,11 @@ Create all files in `ReOrchestra/app/templates/`:
 9. `pages/tasks.html`
 10. `pages/task_detail.html`
 11. `pages/proxies.html`
+
+---
+
+## Questions?
+
+If the spec is unclear or missing something, ask before building.
 
 Good luck!
