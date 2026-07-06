@@ -25,11 +25,18 @@ logs:
 logs-clear:
     rm -f data/logs/*.log
 
-# Clean cache
+# Clean cache only (keep venv and data)
 clean:
     find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; true
     find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null; true
     find . -type f -name "*.pyc" -delete
+
+# Full cleanup (remove venv, cache, data)
+cleanup: clean
+    rm -rf .venv
+    rm -rf data/sessions/*
+    rm -rf data/logs/*
+    rm -f data/reddit.db
 
 # Run tests
 test:
