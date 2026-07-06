@@ -257,6 +257,23 @@ proxy: "http://user:pass@host:8080" → proxy: "host:8080"
 
 ---
 
+## 🧪 Testing
+
+```bash
+cd ReOrchestra && uv run pytest tests/ -v
+```
+
+**93 tests** covering:
+- Account import, retrieval, update, deletion, status transitions
+- Task creation, retrieval, cancellation, progress tracking
+- Queue processing with mocked Camofox (no real browser)
+- Deduplication logic
+- Rate limiting integration tests
+
+All tests use **mocked Camofox** (no browser needed), **in-memory SQLite** (fresh per test).
+
+---
+
 ## 📚 Docs
 
 - [API Documentation](http://localhost:8000/docs) — Swagger UI

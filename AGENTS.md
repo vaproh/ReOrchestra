@@ -363,6 +363,38 @@ Commands via [`just`](https://just.systems/):
 
 ---
 
+## Testing
+
+```bash
+cd ReOrchestra && uv run pytest tests/ -v
+```
+
+**93 tests** across 4 test files:
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `test_accounts.py` | 25 | Import, CRUD, status transitions |
+| `test_tasks.py` | 25 | Creation, retrieval, cancellation |
+| `test_queue.py` | 33 | Processing, deduplication, rate limiting |
+| `test_dedup.py` | 10 | Deduplication logic |
+
+### Test Approach
+
+- **Mocked Camofox** — no real browser, no actual Reddit API calls
+- **In-memory SQLite** — fresh database per test
+- **Real RateLimiter** — tested with config overrides, not mocked
+- **Fast** — full suite runs in ~3 seconds
+
+### Running Specific Tests
+
+```bash
+uv run pytest tests/test_accounts.py -v              # All account tests
+uv run pytest tests/test_queue.py::TestRateLimiterIntegration -v  # Rate limit tests
+uv run pytest tests/ -k "test_import" -v            # Filter by name
+```
+
+---
+
 ## Code Conventions
 
 - Python 3.10+, type hints everywhere
