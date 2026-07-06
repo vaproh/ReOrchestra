@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, Enum as SQLEnum, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship, validates
 from datetime import datetime
 import enum
 
@@ -152,6 +152,12 @@ class Task(Base):
     target_url = Column(Text, nullable=False)
 
     workers_needed = Column(Integer, nullable=False, default=1)
+
+    @validates("workers_needed")
+    def validate_workers_needed(self, key, value):
+        if value < 1:
+            raise ValueError("workers_needed must be at least 1")
+        return value
     workers_completed = Column(Integer, default=0)   # successful executions
     workers_failed = Column(Integer, default=0)      # failed/replaced executions
 
@@ -164,6 +170,12 @@ class Task(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     logs = relationship("TaskExecutionLog", back_populates="task", order_by="TaskExecutionLog.created_at")
+
+    @validates("workers_needed")
+    def validate_workers_needed(self, key, value):
+        if value < 1:
+            raise ValueError("workers_needed must be a positive integer")
+        return value
 
 
 class TaskExecutionLog(Base):
@@ -204,8 +216,19 @@ class TaskExecutionLog(Base):
 _settings = get_settings()
 engine = create_engine(
     _settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in _settings.database_url else {}
+    connect_args={"check_same_thread": False, "timeout": 30} if "sqlite" in _settings.database_url else {}
 )
+
+if "sqlite" in _settings.database_url:
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

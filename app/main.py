@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
     yield
     # Graceful shutdown
     from app.modules.queue import QueueManager
+
     QueueManager.get().stop()
     logger.info("Shutting down")
 

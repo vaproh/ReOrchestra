@@ -4,7 +4,7 @@ from typing import Optional
 
 
 class AccountBase(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=20)
     password: str
     email: Optional[str] = None
     email_password: Optional[str] = None

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     action_delay_ms_max: int = 3000
     batch_size_default: int = 50
 
+    # ===== QUEUE =====
+    max_concurrent_per_task: int = 1
+
     # ===== LOGGING =====
     log_level: str = "INFO"
 
