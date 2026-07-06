@@ -8,6 +8,7 @@ from datetime import datetime, UTC
 
 from app.database import get_db, Task, TaskStatus, TaskExecutionLog, ACTION_TYPES
 from app.schemas.common import SuccessResponse
+from app.schemas.task import TaskCreateRequest
 
 logger = logging.getLogger("tasks")
 
@@ -41,6 +42,8 @@ def _task_dict(t: Task) -> dict:
 @router.get("", response_model=SuccessResponse)
 async def list_tasks(
     status: str = Query(None, description="queued, running, completed, partial, failed, cancelled"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     q = db.query(Task)
@@ -49,19 +52,22 @@ async def list_tasks(
             q = q.filter(Task.status == TaskStatus(status))
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {[s.value for s in TaskStatus]}")
-    tasks = q.order_by(Task.created_at.desc()).limit(100).all()
+    total = q.count()
+    tasks = q.order_by(Task.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
     return SuccessResponse(data={
-        "total": len(tasks),
+        "total": total,
+        "page": page,
+        "per_page": per_page,
         "tasks": [_task_dict(t) for t in tasks],
     })
 
 
 @router.post("", response_model=SuccessResponse)
-async def create_task(request: dict, db: Session = Depends(get_db)):
-    action_type = request.get("action_type")
-    target_url = request.get("target_url")
-    workers_needed = request.get("workers_needed", 1)
-    priority = request.get("priority", 0)
+async def create_task(request: TaskCreateRequest, db: Session = Depends(get_db)):
+    action_type = request.action_type
+    target_url = request.target_url
+    workers_needed = request.workers_needed
+    priority = request.priority
 
     if not action_type:
         raise HTTPException(status_code=400, detail="action_type required")

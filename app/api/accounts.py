@@ -99,11 +99,11 @@ async def list_accounts(
                 query = query.filter(Account.status == AccountStatus[status])
             except KeyError:
                 raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if type:
+    if account_type:
         try:
-            query = query.filter(Account.account_type == AccountType[type])
+            query = query.filter(Account.account_type == AccountType[account_type])
         except KeyError:
-            raise HTTPException(status_code=400, detail=f"Invalid account type: {type}")
+            raise HTTPException(status_code=400, detail=f"Invalid account type: {account_type}")
     if search:
         query = query.filter(Account.username.contains(search))
 

@@ -5,7 +5,7 @@ import logging
 
 from app.database import get_db, Proxy
 from app.schemas.common import SuccessResponse
-from app.schemas.proxy import ProxyImportRequest
+from app.schemas.proxy import ProxyImportRequest, ProxyReplaceRequest, ProxyMarkDeadRequest
 
 logger = logging.getLogger("proxies")
 
@@ -110,10 +110,10 @@ async def import_proxies(
 
 @router.post("/replace", response_model=SuccessResponse)
 async def replace_dead_proxies(
-    request: dict,
+    request: ProxyReplaceRequest,
     db: Session = Depends(get_db),
 ):
-    new_proxy_strings = request.get("proxies", [])
+    new_proxy_strings = request.proxies
 
     dead_proxies = db.query(Proxy).filter(Proxy.status == "dead").order_by(Proxy.id).all()
 
@@ -201,11 +201,11 @@ async def delete_proxy(
 
 @router.post("/mark-dead", response_model=SuccessResponse)
 async def mark_proxy_dead(
-    request: dict,
+    request: ProxyMarkDeadRequest,
     db: Session = Depends(get_db),
 ):
-    proxy_id = request.get("proxy_id")
-    error_msg = request.get("error", "unknown")
+    proxy_id = request.proxy_id
+    error_msg = request.error
 
     proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
     if not proxy:
