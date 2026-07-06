@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}ReOrchestra{% endblock %} — Reddit Automation</title>
+  <meta name="description" content="{% block description %}ReOrchestra — Bulk Reddit account automation dashboard{% endblock %}" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Flowbite -->
+  <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/custom.css" />
+
+  {% block head %}{% endblock %}
+</head>
+<body class="h-full bg-gray-50 font-sans antialiased" hx-boost="false">
+
+  <!-- Sidebar Navigation -->
+  <div class="flex h-full min-h-screen">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed top-0 left-0 z-40 h-screen w-64 bg-gray-900 shadow-xl flex flex-col transition-transform -translate-x-full md:translate-x-0" aria-label="Sidenav">
+      <!-- Brand -->
+      <div class="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
+        <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+        </div>
+        <div>
+          <span class="text-white font-bold text-lg leading-none">ReOrchestra</span>
+          <p class="text-gray-400 text-xs mt-0.5">Reddit Automation</p>
+        </div>
+      </div>
+
+      <!-- Queue status pill -->
+      <div class="px-4 py-3 border-b border-gray-700">
+        <div id="queue-status-pill"
+             hx-get="/htmx/queue-status"
+             hx-trigger="load, every 15s"
+             hx-swap="outerHTML">
+          <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800">
+            <div class="w-2 h-2 rounded-full bg-gray-500 animate-pulse"></div>
+            <span class="text-gray-400 text-xs font-medium">Checking queue…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nav links -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <a href="/dashboard"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'dashboard' %}nav-active{% endif %}">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          <span class="text-sm font-medium">Dashboard</span>
+        </a>
+
+        <a href="/accounts"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'accounts' %}nav-active{% endif %}">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span class="text-sm font-medium">Accounts</span>
+          {% if account_count is defined %}
+          <span class="ml-auto bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded-full">{{ account_count }}</span>
+          {% endif %}
+        </a>
+
+        <a href="/tasks"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'tasks' %}nav-active{% endif %}">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+          <span class="text-sm font-medium">Tasks</span>
+        </a>
+
+        <a href="/proxies"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'proxies' %}nav-active{% endif %}">
+          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+          </svg>
+          <span class="text-sm font-medium">Proxies</span>
+        </a>
+      </nav>
+
+      <!-- Footer -->
+      <div class="px-4 py-3 border-t border-gray-700">
+        <p class="text-gray-500 text-xs text-center">ReOrchestra v0.9.0</p>
+      </div>
+    </aside>
+
+    <!-- Mobile sidebar toggle -->
+    <button id="sidebar-toggle"
+            class="fixed top-4 left-4 z-50 md:hidden p-2 rounded-lg bg-gray-900 text-white shadow-lg"
+            onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+
+    <!-- Main content -->
+    <div class="flex-1 md:ml-64 flex flex-col min-h-screen">
+      <!-- Top bar -->
+      <header class="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
+        <div>
+          <h1 class="text-lg font-semibold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h1>
+          <p class="text-sm text-gray-500">{% block page_subtitle %}{% endblock %}</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- HTMX loading spinner -->
+          <div id="htmx-spinner" class="htmx-indicator flex items-center gap-2 text-blue-600">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="text-sm font-medium">Loading…</span>
+          </div>
+          {% block header_actions %}{% endblock %}
+        </div>
+      </header>
+
+      <!-- Flash messages -->
+      <div id="flash-container" class="px-6 pt-4">
+        {% block flash %}{% endblock %}
+      </div>
+
+      <!-- Page content -->
+      <main class="flex-1 px-6 py-6">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <!-- Toast notification container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+  <!-- Flowbite JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+
+  <!-- HTMX event handlers for toast notifications -->
+  <script>
+    function showToast(message, type = 'success') {
+      const colors = {
+        success: 'bg-green-50 border-green-200 text-green-800',
+        error:   'bg-red-50 border-red-200 text-red-800',
+        warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+        info:    'bg-blue-50 border-blue-200 text-blue-800',
+      };
+      const icons = {
+        success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+        error:   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+        warning: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>',
+        info:    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+      };
+      const toast = document.createElement('div');
+      toast.className = `toast-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg max-w-sm ${colors[type] || colors.info}`;
+      toast.innerHTML = `
+        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type] || icons.info}</svg>
+        <p class="text-sm font-medium flex-1">${message}</p>
+        <button onclick="this.parentElement.remove()" class="text-current opacity-60 hover:opacity-100 flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>`;
+      document.getElementById('toast-container').appendChild(toast);
+      setTimeout(() => toast.remove(), 4200);
+    }
+
+    // Listen for HTMX response events to show toasts
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+      const xhr = evt.detail.xhr;
+      if (!xhr) return;
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (data.data && data.data.message) showToast(data.data.message, 'success');
+        } else {
+          const msg = (data.error && data.error.message) || data.error || 'An error occurred';
+          showToast(msg, 'error');
+        }
+      } catch(e) { /* non-JSON response, ignore */ }
+    });
+
+    document.body.addEventListener('htmx:responseError', function(evt) {
+      showToast('Request failed. Please try again.', 'error');
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
