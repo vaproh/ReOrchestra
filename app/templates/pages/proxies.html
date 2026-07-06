@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Proxies{% endblock %}
+{% block description %}Manage proxy pool — import, replace, monitor status{% endblock %}
+{% block page_title %}Proxies{% endblock %}
+{% block page_subtitle %}Manage your proxy pool{% endblock %}
+
+{% block header_actions %}
+  <button data-modal-target="modal-import-proxies" data-modal-toggle="modal-import-proxies"
+          class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+    </svg>
+    Import
+  </button>
+  <button data-modal-target="modal-replace-proxies" data-modal-toggle="modal-replace-proxies"
+          class="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+    </svg>
+    Replace Dead
+  </button>
+{% endblock %}
+
+{% block content %}
+{% set data = proxies_data.data if proxies_data and proxies_data.data else {} %}
+{% set proxies = data.get('proxies', []) %}
+{% set total = data.get('total', 0) %}
+
+<!-- Stats Row -->
+{% set active_count = proxies | selectattr('status', 'equalto', 'active') | list | length %}
+{% set dead_count   = proxies | selectattr('status', 'equalto', 'dead') | list | length %}
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <p class="text-2xl font-bold text-gray-900">{{ total }}</p>
+    <p class="text-xs text-gray-500 mt-1">Total Proxies</p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <p class="text-2xl font-bold text-green-600">{{ active_count if not current_status else (total if current_status == 'active' else 0) }}</p>
+    <p class="text-xs text-gray-500 mt-1">Active</p>
+  </div>
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
+    <p class="text-2xl font-bold text-red-600">{{ dead_count if not current_status else (total if current_status == 'dead' else 0) }}</p>
+    <p class="text-xs text-gray-500 mt-1">Dead</p>
+  </div>
+</div>
+
+<!-- Filter Tabs + Table -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+  <div class="flex items-center gap-2 px-6 py-4 border-b border-gray-100">
+    {% set tabs = [('', 'All'), ('active', 'Active'), ('dead', 'Dead')] %}
+    {% for tab_val, tab_label in tabs %}
+      <a href="/proxies?status={{ tab_val }}&page={{ page }}"
+         class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                {% if current_status == tab_val %}bg-blue-600 text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-700{% endif %}">
+        {{ tab_label }}
+      </a>
+    {% endfor %}
+    <div class="ml-auto text-xs text-gray-400">{{ total }} proxies</div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+        <tr>
+          <th class="px-6 py-3">Proxy</th>
+          <th class="px-6 py-3">Status</th>
+          <th class="px-6 py-3">Type</th>
+          <th class="px-6 py-3">Provider</th>
+          <th class="px-6 py-3">Fail Count</th>
+          <th class="px-6 py-3">Last Used</th>
+          <th class="px-6 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% if proxies %}
+          {% for proxy in proxies %}
+          <tr id="proxy-{{ proxy.id }}" class="hover:bg-gray-50 transition-colors group">
+            <td class="px-6 py-3">
+              <div>
+                <p class="font-mono text-xs font-medium text-gray-800">{{ proxy.host }}:{{ proxy.port }}</p>
+                {% if proxy.username %}
+                <p class="font-mono text-xs text-gray-400">{{ proxy.username }}:●●●●</p>
+                {% endif %}
+              </div>
+            </td>
+            <td class="px-6 py-3">
+              {% set status = proxy.status %}
+              {% include 'components/status_badge.html' %}
+            </td>
+            <td class="px-6 py-3 text-gray-500 text-xs uppercase">{{ proxy.proxy_type | default('http') }}</td>
+            <td class="px-6 py-3 text-gray-500 text-xs">{{ proxy.provider | default('—') }}</td>
+            <td class="px-6 py-3">
+              <span class="text-xs {% if proxy.fail_count > 5 %}text-red-600 font-semibold{% elif proxy.fail_count > 0 %}text-yellow-600{% else %}text-gray-400{% endif %}">
+                {{ proxy.fail_count | default(0) }}
+              </span>
+            </td>
+            <td class="px-6 py-3 text-gray-400 text-xs whitespace-nowrap">
+              {{ proxy.last_used[:16] | replace('T', ' ') if proxy.last_used else '—' }}
+            </td>
+            <td class="px-6 py-3 text-right">
+              <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {% if proxy.status != 'dead' %}
+                <button hx-post="/api/proxies/mark-dead"
+                        hx-vals='{"proxy_id": {{ proxy.id }}}'
+                        hx-confirm="Mark proxy {{ proxy.host }}:{{ proxy.port }} as dead?"
+                        hx-target="#proxy-{{ proxy.id }}"
+                        hx-swap="outerHTML"
+                        hx-indicator="#htmx-spinner"
+                        title="Mark Dead"
+                        class="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                  </svg>
+                </button>
+                {% endif %}
+                <button hx-delete="/api/proxies/{{ proxy.id }}"
+                        hx-confirm="Delete proxy {{ proxy.host }}:{{ proxy.port }}?"
+                        hx-target="#proxy-{{ proxy.id }}"
+                        hx-swap="outerHTML swap:300ms"
+                        hx-indicator="#htmx-spinner"
+                        title="Delete"
+                        class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" class="px-6 py-16 text-center text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+              </svg>
+              <p class="text-sm font-medium">No proxies found</p>
+              <p class="text-xs mt-1">
+                <button data-modal-target="modal-import-proxies" data-modal-toggle="modal-import-proxies"
+                        class="text-blue-500 hover:underline">Import proxies</button> to get started.
+              </p>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Import Proxies Modal -->
+<div id="modal-import-proxies" tabindex="-1" aria-hidden="true"
+     class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full h-full bg-black/30">
+  <div class="relative p-4 w-full max-w-lg">
+    <div class="relative bg-white rounded-2xl shadow-2xl border border-gray-100">
+      <div class="flex items-center justify-between p-5 border-b border-gray-100">
+        <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+          </svg>
+          Import Proxies
+        </h3>
+        <button type="button" data-modal-hide="modal-import-proxies"
+                class="text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-lg p-1.5 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="import-proxies-form"
+            hx-post="/api/proxies/import"
+            hx-target="#import-proxies-result"
+            hx-swap="innerHTML"
+            hx-indicator="#htmx-spinner"
+            class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Proxy Strings</label>
+          <p class="text-xs text-gray-400 mb-2">
+            One per line:<br>
+            <code class="bg-gray-100 px-1 rounded text-xs">http://host:port</code> or
+            <code class="bg-gray-100 px-1 rounded text-xs">http://user:pass@host:port</code>
+          </p>
+          <textarea name="proxies_text"
+                    rows="8"
+                    placeholder="http://proxy1.example.com:8080&#10;http://user:pass@proxy2.example.com:3128"
+                    class="w-full px-3 py-2 text-sm font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"></textarea>
+        </div>
+        <div id="import-proxies-result"></div>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+          <button type="button" data-modal-hide="modal-import-proxies"
+                  class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            Import
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Replace Dead Proxies Modal -->
+<div id="modal-replace-proxies" tabindex="-1" aria-hidden="true"
+     class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full h-full bg-black/30">
+  <div class="relative p-4 w-full max-w-lg">
+    <div class="relative bg-white rounded-2xl shadow-2xl border border-gray-100">
+      <div class="flex items-center justify-between p-5 border-b border-gray-100">
+        <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Replace Dead Proxies
+        </h3>
+        <button type="button" data-modal-hide="modal-replace-proxies"
+                class="text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-lg p-1.5 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="replace-proxies-form"
+            hx-post="/api/proxies/replace"
+            hx-target="#replace-proxies-result"
+            hx-swap="innerHTML"
+            hx-indicator="#htmx-spinner"
+            class="p-5 space-y-4">
+        <div class="p-3 bg-orange-50 border border-orange-100 rounded-lg text-xs text-orange-700">
+          New proxies replace dead ones one-for-one in order. Provide at least as many as you have dead proxies.
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">New Proxy Strings</label>
+          <textarea name="proxies_text"
+                    rows="8"
+                    placeholder="http://newproxy1.example.com:8080&#10;http://user:pass@newproxy2.example.com:3128"
+                    class="w-full px-3 py-2 text-sm font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"></textarea>
+        </div>
+        <div id="replace-proxies-result"></div>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+          <button type="button" data-modal-hide="modal-replace-proxies"
+                  class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 text-sm font-medium bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+            Replace Dead
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Convert textarea → JSON for proxy import
+  function parseProxies(textarea) {
+    return textarea.value.trim().split('\n')
+      .map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  }
+
+  document.getElementById('import-proxies-form').addEventListener('htmx:configRequest', function(evt) {
+    const proxies = parseProxies(evt.target.querySelector('[name="proxies_text"]'));
+    evt.detail.parameters = { proxies };
+    evt.detail.headers['Content-Type'] = 'application/json';
+  });
+
+  document.getElementById('replace-proxies-form').addEventListener('htmx:configRequest', function(evt) {
+    const proxies = parseProxies(evt.target.querySelector('[name="proxies_text"]'));
+    evt.detail.parameters = { proxies };
+    evt.detail.headers['Content-Type'] = 'application/json';
+  });
+</script>
+{% endblock %}

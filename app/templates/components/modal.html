@@ -1,0 +1,26 @@
+<!-- modal.html — wrapper for Flowbite modals
+     Usage: call with modal_id, modal_title, and modal_body block -->
+<div id="{{ modal_id }}" tabindex="-1" aria-hidden="true"
+     class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-full max-h-full">
+  <div class="relative p-4 w-full max-w-xl max-h-full">
+    <!-- backdrop click to close -->
+    <div class="relative bg-white rounded-2xl shadow-2xl border border-gray-100">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-5 border-b border-gray-100 rounded-t-2xl">
+        <h3 class="text-base font-semibold text-gray-900">{{ modal_title }}</h3>
+        <button type="button"
+                class="text-gray-400 bg-transparent hover:bg-gray-100 hover:text-gray-900 rounded-lg text-sm w-8 h-8 inline-flex justify-center items-center transition-colors"
+                data-modal-hide="{{ modal_id }}">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          <span class="sr-only">Close modal</span>
+        </button>
+      </div>
+      <!-- Body -->
+      <div class="p-5">
+        {{ modal_body | safe }}
+      </div>
+    </div>
+  </div>
+</div>

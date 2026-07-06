@@ -1,12 +1,15 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from datetime import datetime, UTC
+import os
 
 from app.config import get_settings
 from app.database import init_db
 from app.api.router import router
+from app.api.frontend import router as frontend_router
 from app.logging_config import setup_logging, get_logger
 
 setup_logging()
@@ -71,3 +74,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(router, prefix="/api")
+
+# Serve static files (CSS, JS, images)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+# Frontend page routes (no prefix — serves /dashboard, /accounts, etc.)
+app.include_router(frontend_router)

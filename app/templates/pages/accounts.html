@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Accounts{% endblock %}
+{% block description %}Manage Reddit accounts — import, login, monitor status{% endblock %}
+{% block page_title %}Accounts{% endblock %}
+{% block page_subtitle %}Manage and monitor Reddit accounts{% endblock %}
+
+{% block header_actions %}
+  <!-- Import button -->
+  <button data-modal-target="modal-import-accounts" data-modal-toggle="modal-import-accounts"
+          class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+    </svg>
+    Import
+  </button>
+{% endblock %}
+
+{% block content %}
+{% set data = accounts_data.data if accounts_data and accounts_data.data else {} %}
+{% set accounts = data.get('accounts', []) %}
+{% set total = data.get('total', 0) %}
+{% set current_page = page %}
+{% set per_page = 50 %}
+{% set total_pages = ((total / per_page) | int) + (1 if total % per_page else 0) %}
+
+<!-- Filter Tabs + Search -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-4 border-b border-gray-100">
+    <!-- Filter tabs -->
+    <div class="flex items-center gap-1 flex-wrap">
+      {% set tabs = [
+        ('', 'All'),
+        ('fresh', 'Fresh'),
+        ('logged_in', 'Logged In'),
+        ('rate_limited', 'Rate Limited'),
+        ('session_expired', 'Expired'),
+        ('dead', 'Dead'),
+        ('banned', 'Banned'),
+      ] %}
+      {% for tab_val, tab_label in tabs %}
+        <a href="/accounts?status={{ tab_val }}&search={{ search_query | default('') }}&page=1"
+           class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                  {% if current_status == tab_val %}bg-blue-600 text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-700{% endif %}">
+          {{ tab_label }}
+        </a>
+      {% endfor %}
+    </div>
+
+    <!-- Search bar -->
+    <div class="flex-shrink-0 w-full sm:w-64">
+      <div class="relative">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <form method="get" action="/accounts">
+          <input type="hidden" name="status" value="{{ current_status | default('') }}" />
+          <input type="hidden" name="page" value="1" />
+          <input id="search-accounts"
+                 type="text"
+                 name="search"
+                 value="{{ search_query | default('') }}"
+                 placeholder="Search username…"
+                 class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                 hx-get="/accounts"
+                 hx-trigger="keyup changed delay:400ms"
+                 hx-target="body"
+                 hx-push-url="true"
+                 hx-include="[name='status'],[name='page']"
+                 hx-indicator="#htmx-spinner" />
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk action bar -->
+  <div id="bulk-action-bar" class="hidden px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center gap-3">
+    <span class="text-sm text-blue-700"><span id="selected-count">0</span> selected</span>
+    <button onclick="loginSelected()"
+            class="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+      Login Selected
+    </button>
+    <button onclick="deleteSelected()"
+            class="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+      Delete Selected
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+        <tr>
+          <th class="px-6 py-3">
+            <input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"
+                   class="w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer" />
+          </th>
+          <th class="px-6 py-3">Username</th>
+          <th class="px-6 py-3">Status</th>
+          <th class="px-6 py-3">Type</th>
+          <th class="px-6 py-3">Karma</th>
+          <th class="px-6 py-3">Votes Today</th>
+          <th class="px-6 py-3">Last Used</th>
+          <th class="px-6 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50" id="accounts-table-body">
+        {% if accounts %}
+          {% for account in accounts %}
+          <tr id="account-{{ account.id }}" class="hover:bg-gray-50 transition-colors group">
+            <td class="px-6 py-3">
+              <input type="checkbox" name="account_ids" value="{{ account.id }}"
+                     onchange="updateSelection()"
+                     class="account-checkbox w-4 h-4 text-blue-600 border-gray-300 rounded cursor-pointer" />
+            </td>
+            <td class="px-6 py-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500 uppercase flex-shrink-0">
+                  {{ account.username[0] if account.username else '?' }}
+                </div>
+                <div>
+                  <p class="font-medium text-gray-900 text-sm">{{ account.username }}</p>
+                  {% if account.email %}<p class="text-xs text-gray-400">{{ account.email }}</p>{% endif %}
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-3">
+              {% set status = account.status %}
+              {% include 'components/status_badge.html' %}
+            </td>
+            <td class="px-6 py-3 text-gray-500 capitalize">{{ account.account_type | default('—') }}</td>
+            <td class="px-6 py-3 text-gray-600">{{ account.karma_total | default(0) | int }}</td>
+            <td class="px-6 py-3">
+              <span class="text-gray-600">{{ account.votes_today | default(0) }}</span>
+              <span class="text-gray-300">/{{ account.votes_week | default(0) }}wk</span>
+            </td>
+            <td class="px-6 py-3 text-gray-400 text-xs whitespace-nowrap">
+              {{ account.last_used[:16] | replace('T', ' ') if account.last_used else '—' }}
+            </td>
+            <td class="px-6 py-3 text-right">
+              <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button hx-post="/api/accounts/login"
+                        hx-vals='{"account_ids": [{{ account.id }}]}'
+                        hx-target="#account-{{ account.id }}"
+                        hx-swap="outerHTML"
+                        hx-indicator="#htmx-spinner"
+                        title="Login"
+                        class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                  </svg>
+                </button>
+                <button hx-delete="/api/accounts/{{ account.id }}"
+                        hx-confirm="Delete account '{{ account.username }}'? This cannot be undone."
+                        hx-target="#account-{{ account.id }}"
+                        hx-swap="outerHTML swap:300ms"
+                        hx-indicator="#htmx-spinner"
+                        title="Delete"
+                        class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" class="px-6 py-16 text-center text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              <p class="text-sm font-medium">No accounts found</p>
+              <p class="text-xs mt-1">
+                {% if search_query %}Clear your search or {% endif %}
+                <button data-modal-target="modal-import-accounts" data-modal-toggle="modal-import-accounts"
+                        class="text-blue-500 hover:underline">import some accounts</button> to get started.
+              </p>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+    <p class="text-xs text-gray-400">
+      {{ ((current_page - 1) * per_page) + 1 }}–{{ [current_page * per_page, total] | min }} of {{ total }} accounts
+    </p>
+    <div class="flex items-center gap-1">
+      {% if current_page > 1 %}
+        <a href="/accounts?status={{ current_status | default('') }}&search={{ search_query | default('') }}&page={{ current_page - 1 }}"
+           class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">←</a>
+      {% endif %}
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == current_page %}
+          <span class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg">{{ p }}</span>
+        {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
+          <a href="/accounts?status={{ current_status | default('') }}&search={{ search_query | default('') }}&page={{ p }}"
+             class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 3 %}
+          <span class="px-2 text-gray-400">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if current_page < total_pages %}
+        <a href="/accounts?status={{ current_status | default('') }}&search={{ search_query | default('') }}&page={{ current_page + 1 }}"
+           class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">→</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Import Accounts Modal -->
+<div id="modal-import-accounts" tabindex="-1" aria-hidden="true"
+     class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full h-full bg-black/30">
+  <div class="relative p-4 w-full max-w-lg">
+    <div class="relative bg-white rounded-2xl shadow-2xl border border-gray-100">
+      <div class="flex items-center justify-between p-5 border-b border-gray-100">
+        <h3 class="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+          </svg>
+          Import Accounts
+        </h3>
+        <button type="button" data-modal-hide="modal-import-accounts"
+                class="text-gray-400 hover:bg-gray-100 hover:text-gray-900 rounded-lg p-1.5 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="import-accounts-form"
+            hx-post="/api/accounts/import"
+            hx-target="#import-result"
+            hx-swap="innerHTML"
+            hx-indicator="#htmx-spinner"
+            class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Account Type</label>
+          <select name="account_type"
+                  class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+            <option value="upvoter">Upvoter</option>
+            <option value="main">Main</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Accounts</label>
+          <p class="text-xs text-gray-400 mb-2">One per line: <code class="bg-gray-100 px-1 rounded">username:password</code> or <code class="bg-gray-100 px-1 rounded">username:password:email:email_pass:proxy</code></p>
+          <textarea name="accounts_text"
+                    rows="8"
+                    placeholder="user1:pass1&#10;user2:pass2:email@example.com:emailpass&#10;user3:pass3:::http://proxy:8080"
+                    class="w-full px-3 py-2 text-sm font-mono border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"></textarea>
+        </div>
+        <div id="import-result"></div>
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+          <button type="button" data-modal-hide="modal-import-accounts"
+                  class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            Import
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function updateSelection() {
+    const checkboxes = document.querySelectorAll('.account-checkbox:checked');
+    const count = checkboxes.length;
+    const bar = document.getElementById('bulk-action-bar');
+    const countEl = document.getElementById('selected-count');
+    bar.classList.toggle('hidden', count === 0);
+    bar.classList.toggle('flex', count > 0);
+    countEl.textContent = count;
+  }
+
+  function toggleSelectAll(master) {
+    document.querySelectorAll('.account-checkbox').forEach(cb => cb.checked = master.checked);
+    updateSelection();
+  }
+
+  function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.account-checkbox:checked')).map(cb => parseInt(cb.value));
+  }
+
+  function loginSelected() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    fetch('/api/accounts/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_ids: ids })
+    }).then(r => r.json()).then(d => {
+      showToast(d.data?.message || 'Login queued for ' + ids.length + ' accounts', 'success');
+    }).catch(() => showToast('Login request failed', 'error'));
+  }
+
+  function deleteSelected() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    if (!confirm('Delete ' + ids.length + ' account(s)? This cannot be undone.')) return;
+    fetch('/api/accounts/batch-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_ids: ids })
+    }).then(r => r.json()).then(d => {
+      showToast('Deleted ' + ids.length + ' accounts', 'success');
+      setTimeout(() => location.reload(), 800);
+    }).catch(() => showToast('Delete failed', 'error'));
+  }
+
+  // Parse import form textarea → JSON before submit
+  document.getElementById('import-accounts-form').addEventListener('htmx:configRequest', function(evt) {
+    const textarea = evt.target.querySelector('[name="accounts_text"]');
+    const accountType = evt.target.querySelector('[name="account_type"]').value;
+    const lines = textarea.value.trim().split('\n').filter(l => l.trim());
+    const accounts = lines.map(line => {
+      const parts = line.split(':');
+      return {
+        username: parts[0] || '',
+        password: parts[1] || '',
+        email: parts[2] || null,
+        email_password: parts[3] || null,
+        proxy: parts[4] || null,
+      };
+    }).filter(a => a.username && a.password);
+
+    evt.detail.parameters = { accounts: accounts, account_type: accountType };
+    evt.detail.headers['Content-Type'] = 'application/json';
+  });
+</script>
+{% endblock %}

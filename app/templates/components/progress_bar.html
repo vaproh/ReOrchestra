@@ -1,0 +1,9 @@
+{% set pct = ((completed / total * 100) | int) if total and total > 0 else 0 %}
+{% set bar_color = 'bg-green-500' if pct == 100 else ('bg-blue-500' if pct > 0 else 'bg-gray-300') %}
+<div class="flex items-center gap-2">
+  <div class="w-28 bg-gray-200 rounded-full h-2 overflow-hidden flex-shrink-0">
+    <div class="{{ bar_color }} h-2 rounded-full transition-all duration-500"
+         style="width: {{ pct }}%"></div>
+  </div>
+  <span class="text-xs text-gray-500 whitespace-nowrap">{{ completed }}/{{ total }}</span>
+</div>

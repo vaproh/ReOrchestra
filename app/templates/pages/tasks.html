@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks{% endblock %}
+{% block description %}Create and manage automation tasks{% endblock %}
+{% block page_title %}Tasks{% endblock %}
+{% block page_subtitle %}Create and monitor automation tasks{% endblock %}
+
+{% block content %}
+{% set data = tasks_data.data if tasks_data and tasks_data.data else {} %}
+{% set tasks = data.get('tasks', []) %}
+{% set total = data.get('total', 0) %}
+{% set current_page = page %}
+{% set per_page = 50 %}
+{% set total_pages = ((total / per_page) | int) + (1 if total % per_page else 0) %}
+
+<!-- Create Task Form -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+  <div class="px-6 py-4 border-b border-gray-100">
+    <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+      <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Create New Task
+    </h2>
+  </div>
+  <form id="create-task-form"
+        hx-post="/api/tasks"
+        hx-target="#create-task-result"
+        hx-swap="innerHTML"
+        hx-indicator="#htmx-spinner"
+        class="p-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div>
+        <label for="action_type" class="block text-xs font-medium text-gray-600 mb-1.5">Action Type</label>
+        <select id="action_type" name="action_type"
+                class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+          <optgroup label="Voting">
+            <option value="upvote_post">↑ Upvote Post</option>
+            <option value="downvote_post">↓ Downvote Post</option>
+            <option value="upvote_comment">↑ Upvote Comment</option>
+            <option value="downvote_comment">↓ Downvote Comment</option>
+          </optgroup>
+          <optgroup label="Social">
+            <option value="follow_user">👤 Follow User</option>
+            <option value="unfollow_user">✕ Unfollow User</option>
+          </optgroup>
+          <optgroup label="Community">
+            <option value="join_subreddit">+ Join Subreddit</option>
+            <option value="leave_subreddit">− Leave Subreddit</option>
+          </optgroup>
+          <optgroup label="Content">
+            <option value="save_post">🔖 Save Post</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label for="target_url" class="block text-xs font-medium text-gray-600 mb-1.5">Target URL</label>
+        <input id="target_url" name="target_url" type="url"
+               placeholder="https://old.reddit.com/r/example/comments/..."
+               required
+               class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="workers_needed" class="block text-xs font-medium text-gray-600 mb-1.5">Workers</label>
+          <input id="workers_needed" name="workers_needed" type="number"
+                 value="10" min="1" max="1000"
+                 class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+        </div>
+        <div>
+          <label for="priority" class="block text-xs font-medium text-gray-600 mb-1.5">Priority</label>
+          <input id="priority" name="priority" type="number"
+                 value="0" min="0"
+                 class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+        </div>
+      </div>
+    </div>
+    <div id="create-task-result" class="mt-3"></div>
+    <div class="mt-4 flex items-center justify-end gap-2">
+      <button type="reset"
+              class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+        Reset
+      </button>
+      <button type="submit"
+              class="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Task
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Filter Tabs -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+  <div class="flex items-center gap-1 px-6 py-4 border-b border-gray-100 flex-wrap">
+    {% set tabs = [
+      ('', 'All'),
+      ('queued', 'Queued'),
+      ('running', 'Running'),
+      ('completed', 'Completed'),
+      ('partial', 'Partial'),
+      ('failed', 'Failed'),
+      ('cancelled', 'Cancelled'),
+    ] %}
+    {% for tab_val, tab_label in tabs %}
+      <a href="/tasks?status={{ tab_val }}&page=1"
+         class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
+                {% if current_status == tab_val %}bg-blue-600 text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-700{% endif %}">
+        {{ tab_label }}
+      </a>
+    {% endfor %}
+    <div class="ml-auto text-xs text-gray-400">{{ total }} total</div>
+  </div>
+
+  <!-- Auto-refresh for running tab -->
+  {% if current_status == 'running' %}
+  <div class="px-6 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2 text-xs text-blue-600">
+    <div class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
+    Auto-refreshing every 5s
+  </div>
+  {% endif %}
+
+  <!-- Tasks Table -->
+  <div id="task-list"
+       {% if current_status == 'running' %}
+       hx-get="/tasks?status=running&page={{ current_page }}"
+       hx-trigger="every 5s"
+       hx-swap="outerHTML"
+       hx-indicator="#htmx-spinner"
+       {% endif %}
+       class="overflow-x-auto">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+        <tr>
+          <th class="px-6 py-3 w-16">ID</th>
+          <th class="px-6 py-3">Action</th>
+          <th class="px-6 py-3">Target</th>
+          <th class="px-6 py-3 w-40">Progress</th>
+          <th class="px-6 py-3">Status</th>
+          <th class="px-6 py-3">Priority</th>
+          <th class="px-6 py-3">Created</th>
+          <th class="px-6 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% if tasks %}
+          {% for task in tasks %}
+          <tr id="task-row-{{ task.id }}" class="hover:bg-gray-50 transition-colors group">
+            <td class="px-6 py-3 font-mono text-xs text-gray-400">#{{ task.id }}</td>
+            <td class="px-6 py-3">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 whitespace-nowrap">
+                {{ task.action_type | replace('_', ' ') | title }}
+              </span>
+            </td>
+            <td class="px-6 py-3 text-gray-600 max-w-xs">
+              <span class="truncate-url block" title="{{ task.target_url }}">
+                {{ task.target_url[:55] }}{% if task.target_url | length > 55 %}…{% endif %}
+              </span>
+            </td>
+            <td class="px-6 py-3">
+              {% set completed = task.workers_completed %}
+              {% set total = task.workers_needed %}
+              {% include 'components/progress_bar.html' %}
+            </td>
+            <td class="px-6 py-3">
+              {% set status = task.status %}
+              {% include 'components/status_badge.html' %}
+            </td>
+            <td class="px-6 py-3 text-gray-400 text-xs">{{ task.priority | default(0) }}</td>
+            <td class="px-6 py-3 text-gray-400 text-xs whitespace-nowrap">
+              {{ task.created_at[:16] | replace('T', ' ') if task.created_at else '—' }}
+            </td>
+            <td class="px-6 py-3 text-right">
+              <div class="flex items-center justify-end gap-2">
+                {% if task.status == 'running' or task.status == 'queued' %}
+                <button hx-post="/api/tasks/{{ task.id }}/cancel"
+                        hx-confirm="Cancel task #{{ task.id }}?"
+                        hx-target="#task-row-{{ task.id }}"
+                        hx-swap="outerHTML"
+                        hx-indicator="#htmx-spinner"
+                        class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Cancel">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+                {% endif %}
+                {% if task.status in ('failed', 'partial', 'cancelled') %}
+                <button hx-post="/api/tasks/{{ task.id }}/retry"
+                        hx-target="#task-row-{{ task.id }}"
+                        hx-swap="outerHTML"
+                        hx-indicator="#htmx-spinner"
+                        class="p-1.5 text-green-500 hover:bg-green-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        title="Retry">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                </button>
+                {% endif %}
+                <a href="/tasks/{{ task.id }}"
+                   class="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                   title="View detail">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" class="px-6 py-16 text-center text-gray-400">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              <p class="text-sm font-medium">No tasks found</p>
+              <p class="text-xs mt-1">Create a task using the form above to get started.</p>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if total_pages > 1 %}
+  <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+    <p class="text-xs text-gray-400">
+      {{ ((current_page - 1) * per_page) + 1 }}–{{ [current_page * per_page, total] | min }} of {{ total }} tasks
+    </p>
+    <div class="flex items-center gap-1">
+      {% if current_page > 1 %}
+        <a href="/tasks?status={{ current_status | default('') }}&page={{ current_page - 1 }}"
+           class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">←</a>
+      {% endif %}
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == current_page %}
+          <span class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg">{{ p }}</span>
+        {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
+          <a href="/tasks?status={{ current_status | default('') }}&page={{ p }}"
+             class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">{{ p }}</a>
+        {% elif p == 4 or p == total_pages - 3 %}
+          <span class="px-2 text-gray-400">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if current_page < total_pages %}
+        <a href="/tasks?status={{ current_status | default('') }}&page={{ current_page + 1 }}"
+           class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">→</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // After create task succeeds, show toast and refresh task list
+  document.getElementById('create-task-form').addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.successful) {
+      try {
+        const data = JSON.parse(evt.detail.xhr.responseText);
+        if (data.data && data.data.task_id) {
+          showToast('Task #' + data.data.task_id + ' created (queue position ' + (data.data.queue_position || '—') + ')', 'success');
+          document.getElementById('create-task-form').reset();
+          // Refresh page after short delay
+          setTimeout(() => location.reload(), 1000);
+        }
+      } catch(e) {}
+    }
+  });
+</script>
+{% endblock %}

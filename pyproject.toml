@@ -1,7 +1,7 @@
 [project]
 name = "reorchestra"
 version = "0.9.0"
-description = "Bulk Reddit account automation"
+description = "ReOrchestra - Bulk Reddit account automation. Manage hundreds of Reddit accounts with task-based queuing, automatic rate limiting, and stealth browser integration."
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.100",

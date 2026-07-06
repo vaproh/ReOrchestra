@@ -1,0 +1,29 @@
+{% set badge_colors = {
+  'logged_in':       'bg-green-100 text-green-800 ring-1 ring-green-200',
+  'fresh':           'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200',
+  'alive':           'bg-green-100 text-green-800 ring-1 ring-green-200',
+  'active':          'bg-green-100 text-green-800 ring-1 ring-green-200',
+  'success':         'bg-green-100 text-green-800 ring-1 ring-green-200',
+  'completed':       'bg-green-100 text-green-800 ring-1 ring-green-200',
+  'running':         'bg-blue-100 text-blue-800 ring-1 ring-blue-200',
+  'queued':          'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
+  'rate_limited':    'bg-yellow-100 text-yellow-800 ring-1 ring-yellow-200',
+  'partial':         'bg-orange-100 text-orange-800 ring-1 ring-orange-200',
+  'session_expired': 'bg-orange-100 text-orange-800 ring-1 ring-orange-200',
+  'dead':            'bg-red-100 text-red-800 ring-1 ring-red-200',
+  'banned':          'bg-red-100 text-red-800 ring-1 ring-red-200',
+  'failed':          'bg-red-100 text-red-800 ring-1 ring-red-200',
+  'cancelled':       'bg-gray-100 text-gray-600 ring-1 ring-gray-200',
+} %}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ badge_colors.get(status | lower, 'bg-gray-100 text-gray-700 ring-1 ring-gray-200') }}">
+  {% if status == 'running' %}
+    <svg class="w-1.5 h-1.5 mr-1.5 text-blue-500 animate-ping" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+  {% elif status in ('logged_in', 'active', 'fresh', 'success', 'completed') %}
+    <svg class="w-1.5 h-1.5 mr-1.5 text-green-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+  {% elif status in ('dead', 'banned', 'failed') %}
+    <svg class="w-1.5 h-1.5 mr-1.5 text-red-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+  {% elif status in ('rate_limited', 'partial', 'session_expired') %}
+    <svg class="w-1.5 h-1.5 mr-1.5 text-yellow-500" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+  {% endif %}
+  {{ status | replace('_', ' ') | title }}
+</span>
