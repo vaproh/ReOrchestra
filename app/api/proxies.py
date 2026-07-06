@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, UTC
 import logging
 
 from app.database import get_db, Proxy
 from app.schemas.common import SuccessResponse
+from app.schemas.proxy import ProxyImportRequest
 
 logger = logging.getLogger("proxies")
 
@@ -20,6 +21,8 @@ async def list_proxies(
     query = db.query(Proxy)
 
     if status:
+        if status not in ("active", "dead"):
+            raise HTTPException(status_code=400, detail="Invalid status. Valid: active, dead")
         query = query.filter(Proxy.status == status)
     if assigned is True:
         query = query.filter(Proxy.assigned_account_id != None)
@@ -54,10 +57,10 @@ async def list_proxies(
 
 @router.post("/import", response_model=SuccessResponse)
 async def import_proxies(
-    request: dict,
+    request: ProxyImportRequest,
     db: Session = Depends(get_db),
 ):
-    proxy_strings = request.get("proxies", [])
+    proxy_strings = request.proxies
     imported = 0
     skipped = 0
 
@@ -74,9 +77,14 @@ async def import_proxies(
 
         parts = proxy_str.replace("http://", "").split(":")
         host = parts[0] if len(parts) > 0 else None
-        port = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+        port_str = parts[1] if len(parts) > 1 else None
+        if port_str is None or not port_str.isdigit():
+            logger.warning(f"Invalid port in proxy string, skipping: {proxy_str}")
+            skipped += 1
+            continue
+        port = int(port_str)
         username = parts[2] if len(parts) > 2 else None
-        password = ":".join(parts[3:]) if len(parts) > 3 else None
+        password = ":".join(parts[3:]) if len(parts) > 3 and parts[3] else None
 
         proxy = Proxy(
             proxy_string=proxy_str,
@@ -92,7 +100,7 @@ async def import_proxies(
 
     db.commit()
 
-    logger.info(f"Importing {imported} proxies")
+    logger.info("Importing %s proxies", imported)
 
     return SuccessResponse(data={
         "imported": imported,
@@ -138,9 +146,14 @@ async def replace_dead_proxies(
 
         parts = proxy_str.replace("http://", "").split(":")
         host = parts[0] if len(parts) > 0 else None
-        port = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+        port_str = parts[1] if len(parts) > 1 else None
+        if port_str is None or not port_str.isdigit():
+            logger.warning(f"Invalid port in proxy string, skipping: {proxy_str}")
+            skipped += 1
+            continue
+        port = int(port_str)
         username = parts[2] if len(parts) > 2 else None
-        password = ":".join(parts[3:]) if len(parts) > 3 else None
+        password = ":".join(parts[3:]) if len(parts) > 3 and parts[3] else None
 
         dead_proxy.proxy_string = proxy_str
         dead_proxy.host = host
@@ -175,13 +188,13 @@ async def delete_proxy(
 ):
     proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
     if not proxy:
-        return SuccessResponse(data={"deleted": 0})
+        raise HTTPException(status_code=404, detail="Proxy not found")
 
     proxy.assigned_account_id = None
     db.delete(proxy)
     db.commit()
 
-    logger.info(f"Delete proxy {proxy_id}")
+    logger.info("Delete proxy %s", proxy_id)
 
     return SuccessResponse(data={"deleted": 1})
 
@@ -196,7 +209,7 @@ async def mark_proxy_dead(
 
     proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
     if not proxy:
-        return SuccessResponse(data={"success": False, "reason": "not_found"})
+        raise HTTPException(status_code=404, detail="Proxy not found")
 
     proxy.status = "dead"
     proxy.is_active = False
@@ -206,6 +219,6 @@ async def mark_proxy_dead(
 
     db.commit()
 
-    logger.warning(f"Mark proxy dead: {proxy_id}")
+    logger.warning("Mark proxy dead: %s", proxy_id)
 
     return SuccessResponse(data={"success": True})

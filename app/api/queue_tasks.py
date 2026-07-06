@@ -30,7 +30,7 @@ def _task_dict(t: Task) -> dict:
             "total": t.workers_needed,
             "completed": completed,
             "failed": failed,
-            "remaining": max(0, t.workers_needed - completed),
+            "remaining": max(0, t.workers_needed - completed - failed),
         },
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "started_at": t.started_at.isoformat() if t.started_at else None,
@@ -82,7 +82,7 @@ async def create_task(request: dict, db: Session = Depends(get_db)):
         status=TaskStatus.queued,
     )
     db.add(task)
-    db.commit()
+    db.flush()
     db.refresh(task)
 
     queue_pos = (
@@ -152,8 +152,8 @@ async def cancel_task(task_id: int, db: Session = Depends(get_db)):
             evt.set()
 
     db.commit()
-    logger.info(f"Cancel task {task_id}")
-    return SuccessResponse(data={"status": task.status.value})
+    logger.info("Cancel task %s", task_id)
+    return SuccessResponse(data={"status": task.status.value, "message": "Task cancelled"})
 
 
 @router.post("/{task_id}/priority", response_model=SuccessResponse)

@@ -6,6 +6,12 @@ import logging
 
 from app.database import get_db, Account, AccountStatus, AccountType
 
+ACCOUNT_SORT_COLUMNS = {
+    "id", "username", "status", "account_type", "karma_total",
+    "karma_post", "karma_comment", "fail_count", "last_used",
+    "last_login", "created_at", "email_verified",
+}
+
 logger = logging.getLogger("accounts")
 from app.models import TaskExecutionLog
 from app.schemas.account import (
@@ -61,7 +67,8 @@ async def import_accounts(
         imported.append(account)
 
     db.commit()
-    logger.info(f"Imported {len(imported)} accounts, {len(errors)} skipped")
+    db.flush()
+    logger.info("Imported %s accounts, %s skipped", len(imported), len(errors))
 
     return SuccessResponse(data={
         "imported": len(imported),
@@ -74,7 +81,7 @@ async def import_accounts(
 @router.get("", response_model=SuccessResponse)
 async def list_accounts(
     status: str | None = Query(None),
-    type: str | None = Query(None),
+    account_type: str | None = Query(None),
     search: str | None = Query(None),
     sort: str = Query("id"),
     order: str = Query("desc"),
@@ -88,13 +95,21 @@ async def list_accounts(
         if status == "alive":
             query = query.filter(Account.status.in_([AccountStatus.fresh, AccountStatus.logged_in]))
         else:
-            query = query.filter(Account.status == AccountStatus[status])
+            try:
+                query = query.filter(Account.status == AccountStatus[status])
+            except KeyError:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
     if type:
-        query = query.filter(Account.account_type == AccountType[type])
+        try:
+            query = query.filter(Account.account_type == AccountType[type])
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f"Invalid account type: {type}")
     if search:
         query = query.filter(Account.username.contains(search))
 
     total = query.count()
+    if sort not in ACCOUNT_SORT_COLUMNS:
+        raise HTTPException(status_code=400, detail=f"Invalid sort column: {sort}")
     query = query.order_by(getattr(Account, sort).asc() if order == "asc" else getattr(Account, sort).desc())
     accounts = query.offset((page - 1) * per_page).limit(per_page).all()
 
@@ -165,9 +180,15 @@ async def update_account(
     for key, value in updates.items():
         if hasattr(account, key):
             if key == "status" and value:
-                setattr(account, key, AccountStatus[value])
+                try:
+                    setattr(account, key, AccountStatus[value])
+                except KeyError:
+                    raise HTTPException(status_code=400, detail=f"Invalid status: {value}")
             elif key == "account_type" and value:
-                setattr(account, key, AccountType[value])
+                try:
+                    setattr(account, key, AccountType[value])
+                except KeyError:
+                    raise HTTPException(status_code=400, detail=f"Invalid account type: {value}")
             else:
                 setattr(account, key, value)
 
@@ -207,13 +228,22 @@ async def batch_delete_accounts(
 ):
     query = db.query(Account)
 
+    if not request.ids and not request.filters:
+        raise HTTPException(status_code=400, detail="Either 'ids' or 'filters' must be provided")
+
     if request.ids:
         query = query.filter(Account.id.in_(request.ids))
     elif request.filters:
         if "status" in request.filters:
-            query = query.filter(Account.status == AccountStatus[request.filters["status"]])
+            try:
+                query = query.filter(Account.status == AccountStatus[request.filters["status"]])
+            except KeyError:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {request.filters['status']}")
         if "type" in request.filters:
-            query = query.filter(Account.account_type == AccountType[request.filters["type"]])
+            try:
+                query = query.filter(Account.account_type == AccountType[request.filters["type"]])
+            except KeyError:
+                raise HTTPException(status_code=400, detail=f"Invalid account type: {request.filters['type']}")
 
     accounts = query.all()
     for account in accounts:
@@ -312,9 +342,15 @@ async def batch_login_accounts(
     query = db.query(Account)
 
     if request.filters.get("status"):
-        query = query.filter(Account.status == AccountStatus[request.filters["status"]])
+        try:
+            query = query.filter(Account.status == AccountStatus[request.filters["status"]])
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {request.filters['status']}")
     if request.filters.get("type"):
-        query = query.filter(Account.account_type == AccountType[request.filters["type"]])
+        try:
+            query = query.filter(Account.account_type == AccountType[request.filters["type"]])
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f"Invalid account type: {request.filters['type']}")
 
     accounts = query.all()
     if not accounts:

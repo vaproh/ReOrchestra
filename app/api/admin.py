@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, UTC
-import requests as http_requests
+import httpx
 import logging
 
 from app.database import get_db, Account, Proxy
@@ -20,16 +20,17 @@ async def health_check():
     settings = get_settings()
     camofox_status = {"connected": False, "port": settings.camofox_port}
     try:
-        r = http_requests.get(f"http://localhost:{settings.camofox_port}/", timeout=settings.timeout_admin_health)
-        if r.ok:
-            camofox_status["connected"] = True
-            try:
-                camofox_status.update(r.json())
-            except (ValueError, KeyError) as e:
-                logger.warning(f"health | bad_json_response | error={e}")
-    except http_requests.exceptions.ConnectionError:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"http://localhost:{settings.camofox_port}/", timeout=settings.timeout_admin_health)
+            if r.is_success:
+                camofox_status["connected"] = True
+                try:
+                    camofox_status.update(r.json())
+                except (ValueError, KeyError) as e:
+                    logger.warning(f"health | bad_json_response | error={e}")
+    except httpx.ConnectError:
         logger.warning("health | camofox_unreachable | port=%s", settings.camofox_port)
-    except http_requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         logger.warning("health | camofox_timeout | port=%s", settings.camofox_port)
     except Exception as e:
         logger.error("health | camofox_check_failed | error=%s", e)
@@ -87,7 +88,10 @@ async def get_stats(db: Session = Depends(get_db)):
             TaskExecutionLog.action_type.in_(["downvote_post", "downvote_comment"]),
             TaskExecutionLog.created_at >= month_ago,
         ).scalar() or 0,
-        "login": 0,
+        "login": db.query(func.count(TaskExecutionLog.id)).filter(
+            TaskExecutionLog.action_type == "login",
+            TaskExecutionLog.created_at >= month_ago,
+        ).scalar() or 0,
     }
 
     total_proxies = db.query(func.count(Proxy.id)).scalar() or 0

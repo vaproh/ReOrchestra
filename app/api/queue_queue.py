@@ -48,7 +48,11 @@ async def view_queue(db: Session = Depends(get_db)):
 async def start_queue():
     logger.info("Queue start requested")
     manager = QueueManager.get()
-    manager.start()
+    try:
+        manager.start()
+    except Exception as e:
+        logger.error("Queue start failed | error=%s", e)
+        return SuccessResponse(data={"processing": False})
     return SuccessResponse(data={"processing": True})
 
 
@@ -56,7 +60,10 @@ async def start_queue():
 async def stop_queue():
     logger.info("Queue stop requested")
     manager = QueueManager.get()
-    manager.stop()
+    try:
+        manager.stop()
+    except Exception as e:
+        logger.error("Queue stop failed | error=%s", e)
     return SuccessResponse(data={"processing": False})
 
 
@@ -68,7 +75,7 @@ async def queue_status(db: Session = Depends(get_db)):
     total_accounts = db.query(Account).count()
     logged_in = db.query(Account).filter(Account.status == AccountStatus.logged_in).count()
     rate_limited = db.query(Account).filter(Account.status == AccountStatus.rate_limited).count()
-    dead = db.query(Account).filter(Account.status.in_([AccountStatus.dead, AccountStatus.banned])).count()
+    dead = db.query(Account).filter(Account.status == AccountStatus.dead).count()
 
     # Task stats
     queued_count = db.query(Task).filter(Task.status == TaskStatus.queued).count()
