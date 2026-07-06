@@ -45,3 +45,7 @@ test:
 # Lint code
 lint:
     ruff check .
+
+# Format code
+fmt:
+    ruff format app/ tests/
