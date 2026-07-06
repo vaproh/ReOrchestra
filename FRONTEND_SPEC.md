@@ -20,6 +20,7 @@
 | Styling | Tailwind CSS (CDN) |
 | Components | Flowbite |
 | Interactivity | HTMX |
+| HTMX Helpers | FastHX |
 | Icons | Heroicons |
 
 **CDN Links:**
@@ -350,7 +351,30 @@ POST   /api/proxies/mark-dead          # Mark dead
 
 ## 7. HTMX Patterns
 
-### Form Submission
+### 7.1 FastHX Integration
+
+FastHX provides cleaner HTMX patterns for FastAPI. Use the `@hx` decorator for HTMX-aware responses.
+
+**Setup in `main.py`:**
+```python
+from fasthx import FastHX
+
+app = FastAPI(...)
+hx = FastHX(app)
+
+# Use @hx() for HTMX-aware template rendering
+@hx(template="pages/dashboard.html")
+async def dashboard(request: Request):
+    stats = await get_stats()
+    return {"stats": stats, "request": request}
+```
+
+**Key FastHX features:**
+- `@hx()` - Renders template with context for HTMX requests
+- `HXResponse` - For custom HTMX responses with triggers, redirects
+- `request.hx` - Check if request is HTMX
+
+### 7.2 Form Submission
 ```html
 <form hx-post="/api/tasks" hx-target="#task-list" hx-swap="innerHTML">
 ```

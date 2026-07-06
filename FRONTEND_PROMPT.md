@@ -24,9 +24,32 @@ Build a complete web dashboard for ReOrchestra using **HTMX + Jinja2 + Tailwind 
 - **Styling**: Tailwind CSS via CDN
 - **Components**: Flowbite
 - **Interactivity**: HTMX
+- **HTMX Helpers**: FastHX
 - **Icons**: Heroicons
 
-### CDN Links (use these)
+### Dependencies (already in pyproject.toml)
+```python
+fasthx>=0.5
+jinja2>=3.0
+```
+
+### FastHX Setup
+
+Add to `main.py`:
+```python
+from fasthx import FastHX
+
+app = FastAPI(...)
+hx = FastHX(app)
+
+@hx(template="pages/dashboard.html")
+async def dashboard(request: Request):
+    return {"stats": stats, "request": request}
+```
+
+Use `@hx()` decorator for HTMX-aware template responses. See FRONTEND_SPEC.md for full FastHX patterns.
+
+### CDN Links
 ```html
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
