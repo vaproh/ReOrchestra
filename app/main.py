@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.config import get_settings
 from app.database import init_db
@@ -49,7 +49,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "error": {
                 "code": f"HTTP_{exc.status_code}",
                 "message": exc.detail,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(UTC).isoformat() + "Z",
             }
         },
     )
@@ -64,7 +64,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": {
                 "code": "INTERNAL_ERROR",
                 "message": str(exc),
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(UTC).isoformat() + "Z",
             }
         },
     )

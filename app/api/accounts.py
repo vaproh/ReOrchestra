@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 import logging
 
@@ -28,7 +28,7 @@ def session_valid(username: str) -> tuple[bool, float | None]:
     session_path = os.path.join(settings.session_dir, f"{username}.cookies")
     if not os.path.exists(session_path):
         return False, None
-    age_hours = (datetime.utcnow() - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
+    age_hours = (datetime.now(UTC) - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
     return age_hours < settings.max_session_age_hours, age_hours
 
 
@@ -171,7 +171,7 @@ async def update_account(
             else:
                 setattr(account, key, value)
 
-    account.updated_at = datetime.utcnow()
+    account.updated_at = datetime.now(UTC)
     db.commit()
 
     logger.info(f"Update account {account_id}: {list(updates.keys())}")
@@ -256,7 +256,7 @@ async def login_accounts(
             )
             if success:
                 account.status = AccountStatus.logged_in
-                account.last_login = datetime.utcnow()
+                account.last_login = datetime.now(UTC)
                 db.commit()
                 logger.info(f"Login success: {account.username}")
             results.append({"account_id": account.id, "username": account.username, "success": success, "time_ms": time_ms})
@@ -336,7 +336,7 @@ async def batch_login_accounts(
             )
             if success:
                 account.status = AccountStatus.logged_in
-                account.last_login = datetime.utcnow()
+                account.last_login = datetime.now(UTC)
                 db.commit()
             results.append({"account_id": account.id, "username": account.username, "success": success, "time_ms": time_ms})
         except Exception as e:

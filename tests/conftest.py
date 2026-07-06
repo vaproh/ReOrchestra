@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional
 
 import pytest
@@ -538,7 +538,7 @@ def running_task(db_session, fifty_accounts):
         target_url="https://old.reddit.com/r/test/comments/abc123/",
         workers_needed=10,
         status=TaskStatus.running,
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(UTC),
     )
     db_session.add(task)
     db_session.commit()
@@ -557,8 +557,8 @@ def completed_task(db_session, fifty_accounts):
         workers_needed=10,
         workers_completed=10,
         status=TaskStatus.completed,
-        started_at=datetime.utcnow() - timedelta(minutes=5),
-        completed_at=datetime.utcnow(),
+        started_at=datetime.now(UTC) - timedelta(minutes=5),
+        completed_at=datetime.now(UTC),
     )
     db_session.add(task)
     db_session.commit()

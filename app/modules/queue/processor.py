@@ -19,7 +19,7 @@ import hashlib
 import time
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -110,7 +110,7 @@ class QueueProcessor:
         if task.status in (TaskStatus.completed, TaskStatus.cancelled):
             return task
         task.status = TaskStatus.cancelled
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(UTC)
         # Signal the running thread to abort this task
         evt = self._cancel_events.get(task_id)
         if evt:
@@ -203,7 +203,7 @@ class QueueProcessor:
 
         # Mark running
         task.status = TaskStatus.running
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(UTC)
         db.commit()
 
         cancel_event = threading.Event()
@@ -436,7 +436,7 @@ class QueueProcessor:
                 account.status = AccountStatus.rate_limited
                 logger.info(f"Account {account_id} rate limited",
                           extra={"account_id": account_id})
-            account.last_used = datetime.utcnow()
+            account.last_used = datetime.now(UTC)
 
         # Update task counters
         if success:
@@ -461,7 +461,7 @@ class QueueProcessor:
         else:
             task.status = TaskStatus.failed
 
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(UTC)
         db.commit()
         logger.info(f"Task {task.id} {task.status.value}: {task.workers_completed} done, {task.workers_failed} failed",
                   extra={"task_id": task.id, "status": task.status.value,

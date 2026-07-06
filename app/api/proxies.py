@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 
 from app.database import get_db, Proxy
@@ -151,7 +151,7 @@ async def replace_dead_proxies(
         dead_proxy.is_active = True
         dead_proxy.fail_count = 0
         dead_proxy.last_error = None
-        dead_proxy.last_used = datetime.utcnow()
+        dead_proxy.last_used = datetime.now(UTC)
 
         replaced += 1
 

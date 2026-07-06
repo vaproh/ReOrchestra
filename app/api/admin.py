@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import requests as http_requests
 import logging
 
@@ -37,7 +37,7 @@ async def health_check():
     return SuccessResponse(data={
         "status": "ok",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(UTC).isoformat() + "Z",
         "camofox": camofox_status,
         "vnc": {
             "enabled": settings.vnc_enabled,
@@ -70,7 +70,7 @@ async def get_stats(db: Session = Depends(get_db)):
         "dead": db.query(func.count(Account.id)).filter(Account.status == AccountStatus.dead).scalar() or 0,
     }
 
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
 

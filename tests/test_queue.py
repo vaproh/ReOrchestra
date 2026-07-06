@@ -18,7 +18,7 @@ Covers:
 import pytest
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from unittest.mock import patch, MagicMock
 
 
@@ -214,7 +214,7 @@ class TestRateLimiterIntegration:
 
     def test_cooldown_blocks_recent_vote(self, db_session, fresh_account, real_rate_limiter):
         """Account that voted recently (within 120s) should be blocked."""
-        fresh_account.last_vote_at = datetime.utcnow() - timedelta(seconds=60)
+        fresh_account.last_vote_at = datetime.now(UTC) - timedelta(seconds=60)
         db_session.commit()
 
         allowed, reason = real_rate_limiter.check(fresh_account, db_session)
@@ -224,7 +224,7 @@ class TestRateLimiterIntegration:
 
     def test_cooldown_allows_old_vote(self, db_session, fresh_account, real_rate_limiter):
         """Account that voted > 120s ago should be allowed."""
-        fresh_account.last_vote_at = datetime.utcnow() - timedelta(seconds=180)
+        fresh_account.last_vote_at = datetime.now(UTC) - timedelta(seconds=180)
         db_session.commit()
 
         allowed, reason = real_rate_limiter.check(fresh_account, db_session)
@@ -237,7 +237,7 @@ class TestRateLimiterIntegration:
         fresh_account.active_hours_start = 9
         fresh_account.active_hours_end = 17
         # Current hour is 3am (outside 9-17)
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if now.hour >= 9 and now.hour <= 17:
             # Skip if we're in the active window, this test won't be valid
             # In real scenario we'd mock datetime
@@ -245,7 +245,7 @@ class TestRateLimiterIntegration:
         db_session.commit()
 
         allowed, reason = real_rate_limiter.check(fresh_account, db_session)
-        current_hour = datetime.utcnow().hour
+        current_hour = datetime.now(UTC).hour
 
         if current_hour < 9 or current_hour > 17:
             assert allowed is False
@@ -283,7 +283,7 @@ class TestRateLimiterIntegration:
                 success=True,
                 outcome="success",
                 dedup_hash=h,
-                created_at=datetime.utcnow() - timedelta(hours=i)
+                created_at=datetime.now(UTC) - timedelta(hours=i)
             )
             db_session.add(log)
         db_session.commit()
@@ -311,7 +311,7 @@ class TestRateLimiterIntegration:
                 success=True,
                 outcome="success",
                 dedup_hash=h,
-                created_at=datetime.utcnow() - timedelta(hours=i)
+                created_at=datetime.now(UTC) - timedelta(hours=i)
             )
             db_session.add(log)
         for i in range(40):
@@ -324,7 +324,7 @@ class TestRateLimiterIntegration:
                 success=True,
                 outcome="success",
                 dedup_hash=h,
-                created_at=datetime.utcnow() - timedelta(hours=i)
+                created_at=datetime.now(UTC) - timedelta(hours=i)
             )
             db_session.add(log)
         db_session.commit()
@@ -349,7 +349,7 @@ class TestRateLimiterIntegration:
         """Fresh account within all limits should be allowed."""
         fresh_account.votes_today = 5
         fresh_account.votes_this_week = 50
-        fresh_account.last_vote_at = datetime.utcnow() - timedelta(hours=5)
+        fresh_account.last_vote_at = datetime.now(UTC) - timedelta(hours=5)
         fresh_account.active_hours_start = 0
         fresh_account.active_hours_end = 23
         db_session.commit()

@@ -21,7 +21,7 @@ Covers:
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 class TestAccountImport:
@@ -388,7 +388,7 @@ class TestAccountStatusTransitions:
         
         account = accounts_by_status["fresh"]
         account.status = AccountStatus.logged_in
-        account.last_login = datetime.utcnow()
+        account.last_login = datetime.now(UTC)
         db_session.commit()
         
         db_session.refresh(account)
@@ -469,11 +469,11 @@ class TestAccountHealthTracking:
         
     def test_last_failure_recorded(self, db_session, logged_in_account):
         """last_failure_at should be set on failure."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
         logged_in_account.last_failure_at = now
         logged_in_account.consecutive_failures = 1
         db_session.commit()
-        
+
         db_session.refresh(logged_in_account)
         assert logged_in_account.last_failure_at == now
         

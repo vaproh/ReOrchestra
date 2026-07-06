@@ -23,7 +23,7 @@ Covers:
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, UTC
 
 
 class TestTaskCreation:
@@ -206,7 +206,7 @@ class TestTaskRetrieval:
                 target_url=f"https://old.reddit.com/r/test/comments/running_{i}/",
                 workers_needed=10,
                 status=TaskStatus.running,
-                started_at=datetime.utcnow(),
+                started_at=datetime.now(UTC),
             )
             tasks.append(task)
         
@@ -218,8 +218,8 @@ class TestTaskRetrieval:
                 workers_needed=10,
                 workers_completed=10,
                 status=TaskStatus.completed,
-                started_at=datetime.utcnow() - timedelta(minutes=5),
-                completed_at=datetime.utcnow(),
+                started_at=datetime.now(UTC) - timedelta(minutes=5),
+                completed_at=datetime.now(UTC),
             )
             tasks.append(task)
         
@@ -232,8 +232,8 @@ class TestTaskRetrieval:
                 workers_completed=0,
                 workers_failed=10,
                 status=TaskStatus.failed,
-                started_at=datetime.utcnow() - timedelta(minutes=5),
-                completed_at=datetime.utcnow(),
+                started_at=datetime.now(UTC) - timedelta(minutes=5),
+                completed_at=datetime.now(UTC),
             )
             tasks.append(task)
         
@@ -245,8 +245,8 @@ class TestTaskRetrieval:
             workers_completed=5,
             workers_failed=5,
             status=TaskStatus.partial,
-            started_at=datetime.utcnow() - timedelta(minutes=5),
-            completed_at=datetime.utcnow(),
+            started_at=datetime.now(UTC) - timedelta(minutes=5),
+            completed_at=datetime.now(UTC),
         )
         tasks.append(task)
         
@@ -348,7 +348,7 @@ class TestTaskCancellation:
         from app.models import TaskStatus
         
         queued_task_noaccounts.status = TaskStatus.cancelled
-        queued_task_noaccounts.completed_at = datetime.utcnow()
+        queued_task_noaccounts.completed_at = datetime.now(UTC)
         db_session.commit()
         
         db_session.refresh(queued_task_noaccounts)
@@ -360,7 +360,7 @@ class TestTaskCancellation:
         from app.models import TaskStatus
         
         running_task.status = TaskStatus.cancelled
-        running_task.completed_at = datetime.utcnow()
+        running_task.completed_at = datetime.now(UTC)
         db_session.commit()
         
         db_session.refresh(running_task)
@@ -450,7 +450,7 @@ class TestTaskProgressTracking:
         
         queued_task.workers_completed = queued_task.workers_needed
         queued_task.status = TaskStatus.completed
-        queued_task.completed_at = datetime.utcnow()
+        queued_task.completed_at = datetime.now(UTC)
         db_session.commit()
         
         db_session.refresh(queued_task)
@@ -463,7 +463,7 @@ class TestTaskProgressTracking:
         queued_task.workers_completed = 5
         queued_task.workers_failed = 5
         queued_task.status = TaskStatus.partial
-        queued_task.completed_at = datetime.utcnow()
+        queued_task.completed_at = datetime.now(UTC)
         db_session.commit()
         
         db_session.refresh(queued_task)

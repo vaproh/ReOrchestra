@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 import logging
 
+from datetime import datetime, UTC
+
 from app.database import get_db, Task, TaskStatus, TaskExecutionLog, ACTION_TYPES
 from app.schemas.common import SuccessResponse
 
@@ -141,7 +143,7 @@ async def cancel_task(task_id: int, db: Session = Depends(get_db)):
         return SuccessResponse(data={"status": task.status.value, "message": "Task already finished"})
 
     task.status = TaskStatus.cancelled
-    task.completed_at = __import__("datetime").datetime.utcnow()
+    task.completed_at = datetime.now(UTC)
 
     # Signal the running processor thread if active
     if processor:

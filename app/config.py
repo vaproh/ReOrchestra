@@ -2,12 +2,18 @@ try:
     from pydantic_settings import BaseSettings
 except ImportError:
     from pydantic import BaseSettings
+from pydantic import ConfigDict
 
 from functools import lru_cache
 import os
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     # ===== PATHS =====
     proxy_file: str = "data/proxies.txt"
     database_url: str = "sqlite:///./data/reddit.db"
@@ -76,11 +82,6 @@ class Settings(BaseSettings):
             return ["*"]
         origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
         return origins if origins else ["*"]
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
 
 
 @lru_cache

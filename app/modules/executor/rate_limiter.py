@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Tuple
 import logging
 
@@ -30,7 +30,8 @@ class RateLimiter:
             return False, "weekly_limit_reached"
 
         if account.last_vote_at:
-            seconds_since = (datetime.utcnow() - account.last_vote_at).total_seconds()
+            now_utc = datetime.now(UTC).replace(tzinfo=None)
+            seconds_since = (now_utc - account.last_vote_at).total_seconds()
             if seconds_since < min_seconds_between:
                 return False, "cooldown_active"
 
@@ -43,14 +44,14 @@ class RateLimiter:
         return True, ""
 
     def _is_within_active_hours(self, account: Account) -> bool:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         current_hour = now.hour
         return account.active_hours_start <= current_hour <= account.active_hours_end
 
     def _vote_ratio_too_high(self, account: Account, db: Session) -> bool:
         max_vote_ratio = self.config.get("rate_limits", "max_vote_only_ratio", default=0.3)
 
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         total_actions = db.query(TaskExecutionLog).filter(
             TaskExecutionLog.account_id == account.id,
             TaskExecutionLog.created_at >= week_ago,
@@ -72,7 +73,7 @@ class RateLimiter:
         return vote_ratio > max_vote_ratio
 
     def record_vote(self, account: Account, db: Session) -> None:
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
 
         if self._should_reset_daily(account, now):
             account.votes_today = 0

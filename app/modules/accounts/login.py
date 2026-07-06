@@ -5,6 +5,7 @@ import random
 import asyncio
 import re
 import logging
+from datetime import datetime, UTC
 from typing import Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -157,7 +158,7 @@ class LoginService:
             return False
         try:
             from datetime import datetime
-            file_age_hours = (datetime.utcnow() - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
+            file_age_hours = (datetime.now(UTC) - datetime.fromtimestamp(os.path.getmtime(session_path))).total_seconds() / 3600
             if file_age_hours > get_settings().max_session_age_hours:
                 logger.info(f"Session expired: {username} ({file_age_hours:.1f}h)", extra={"username": username, "hours": file_age_hours})
                 return False
