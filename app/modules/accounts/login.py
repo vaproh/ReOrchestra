@@ -1,4 +1,3 @@
-import os
 import time
 import random
 import asyncio
@@ -7,7 +6,6 @@ import logging
 from typing import Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
-from app.config import get_settings
 from app.modules.executor.browser import CamofoxClient
 from app.models import get_db, Account
 
