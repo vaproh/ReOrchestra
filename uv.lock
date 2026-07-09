@@ -178,7 +178,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -209,7 +209,7 @@ resolution-markers = [
     "python_full_version < '3.11'",
 ]
 dependencies = [
-    { name = "fastapi" },
+    { name = "fastapi", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d7/c3/d9e248cc90e2be18e6dab0274bfc3cfdab0dd6fe63ff9f5f41b8550500d7/fasthx-3.1.0.tar.gz", hash = "sha256:8826004329d2b3a557963e39ea73baf0a311c63628c411723b76d4f0dfef53ae", size = 20160, upload-time = "2025-12-31T15:48:56.319Z" }
 wheels = [
@@ -224,7 +224,7 @@ resolution-markers = [
     "python_full_version >= '3.11'",
 ]
 dependencies = [
-    { name = "fastapi" },
+    { name = "fastapi", marker = "python_full_version >= '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1d/fb/aec2241bfb8f308928f9d900cfa536e63e3ed22582ca9e53d580fcbd0714/fasthx-3.2.0.tar.gz", hash = "sha256:7844ed99002262104dff3f2a40f4267e600b846d6bf4873270e6b67e4f59b17b", size = 20640, upload-time = "2026-07-06T15:51:23.412Z" }
 wheels = [
@@ -805,7 +805,7 @@ wheels = [
 
 [[package]]
 name = "reorchestra"
-version = "0.9.0"
+version = "0.9.5"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },

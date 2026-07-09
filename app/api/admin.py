@@ -44,7 +44,7 @@ async def health_check():
     return SuccessResponse(
         data={
             "status": "ok",
-            "version": "0.9.0",
+            "version": "0.9.5",
             "timestamp": datetime.now(UTC).isoformat() + "Z",
             "camofox": camofox_status,
             "vnc": {

@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ReOrchestra",
-    version="0.9.0",
+    version="0.9.5",
     lifespan=lifespan,
 )
 
