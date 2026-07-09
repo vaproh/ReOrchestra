@@ -37,40 +37,47 @@ app/
 ├── api/                    # FastAPI routers
 │   ├── router.py           # Central router
 │   ├── accounts.py         # /api/accounts/*
-│   ├── tasks.py            # /api/tasks/*
-│   ├── queue.py            # /api/queue/*
+│   ├── queue_tasks.py     # /api/tasks/*
+│   ├── queue_queue.py     # /api/queue/*
 │   ├── proxies.py          # /api/proxies/*
-│   └── admin.py            # /api/admin/*
+│   ├── admin.py           # /api/admin/*
+│   └── frontend.py        # Dashboard pages (/)
 │
 ├── models/                 # SQLAlchemy models
 │   └── __init__.py         # Account, Proxy, Task, TaskExecutionLog
 │
 ├── schemas/                # Pydantic schemas
 │   ├── account.py
-│   └── common.py
+│   ├── common.py
+│   └── proxy.py
 │
-├── modules/                # Business logic modules
-│   ├── accounts/           # Account management
-│   │   ├── login.py        # LoginService
-│   │   └── service.py
-│   │
-│   ├── queue/              # Queue processing
-│   │   ├── __init__.py     # QueueManager
-│   │   └── processor.py    # QueueProcessor (background loop)
-│   │
-│   ├── executor/           # Browser automation
-│   │   ├── browser.py      # CamofoxClient
-│   │   ├── rate_limiter.py # RateLimiter
-│   │   └── actions/        # Action executors
-│   │       ├── base.py     # BaseAction
-│   │       └── actions.py  # 9 action classes
-│   │
-│   └── shared/             # Shared utilities
-│       ├── config.py       # Config helper
-│       └── exceptions.py   # Custom exceptions
+├── templates/               # Jinja2 templates (HTMX + Flowbite)
+│   ├── base.html
+│   ├── pages/             # dashboard, accounts, tasks, proxies
+│   └── components/         # stat_card, status_badge, modal
 │
-└── config/
-    └── default.yaml        # App configuration
+├── static/                  # CSS, JS
+│   └── css/
+│       └── custom.css
+│
+└── modules/                # Business logic modules
+    ├── accounts/           # Account management
+    │   └── login.py       # LoginService
+    │
+    ├── queue/             # Queue processing
+    │   ├── __init__.py    # QueueManager
+    │   └── processor.py    # QueueProcessor (background loop)
+    │
+    ├── executor/           # Browser automation
+    │   ├── browser.py      # CamofoxClient
+    │   ├── rate_limiter.py # RateLimiter
+    │   └── actions/        # Action executors
+    │       ├── base.py     # BaseAction
+    │       └── actions.py  # 9 action classes
+    │
+    └── shared/             # Shared utilities
+        ├── config.py       # ConfigService
+        └── exceptions.py   # Custom exceptions
 ```
 
 ---
@@ -78,7 +85,6 @@ app/
 ## Modules
 
 ### accounts
-- **service.py** — Account CRUD, status management
 - **login.py** — LoginService for Camofox-based login
 
 ### queue
@@ -157,18 +163,23 @@ SHA256 of `{account_id}:{action_type}:{target_url}`. Prevents same account doing
 |--------|----------|---------|
 | POST | `/api/accounts/import` | Import accounts |
 | POST | `/api/accounts/login` | Login accounts via Camofox |
+| POST | `/api/accounts/logout` | Logout accounts |
 | GET | `/api/accounts` | List accounts |
 | GET | `/api/accounts/{id}` | Get account details |
 | PATCH | `/api/accounts/{id}` | Update account |
 | DELETE | `/api/accounts/{id}` | Delete account |
+| POST | `/api/accounts/batch-delete` | Bulk delete |
+| POST | `/api/accounts/batch-login` | Bulk login |
 
 ### Tasks
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | POST | `/api/tasks` | Create task |
 | GET | `/api/tasks` | List tasks |
-| GET | `/api/tasks/{id}` | Get task status |
+| GET | `/api/tasks/{id}` | Get task status + logs |
 | POST | `/api/tasks/{id}/cancel` | Cancel task |
+| POST | `/api/tasks/{id}/retry` | Retry task |
+| POST | `/api/tasks/{id}/priority` | Boost priority |
 
 ### Queue
 | Method | Endpoint | Purpose |
@@ -176,12 +187,39 @@ SHA256 of `{account_id}:{action_type}:{target_url}`. Prevents same account doing
 | POST | `/api/queue/start` | Start queue processor |
 | POST | `/api/queue/stop` | Stop queue processor |
 | GET | `/api/queue/status` | Queue status |
+| GET | `/api/queue` | View queued/running tasks |
+
+### Proxies
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/proxies` | List proxies |
+| POST | `/api/proxies/import` | Import proxies |
+| DELETE | `/api/proxies/{id}` | Delete proxy |
+| POST | `/api/proxies/replace` | Replace dead proxies |
+| POST | `/api/proxies/mark-dead` | Mark proxy dead |
 
 ### Admin
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/api/admin/health` | Health check |
 | GET | `/api/admin/stats` | Statistics |
+
+### Dashboard (HTML Pages)
+| Route | Purpose |
+|-------|---------|
+| `/` | Redirect to `/dashboard` |
+| `/dashboard` | Stats overview, queue control |
+| `/accounts` | Account management |
+| `/tasks` | Task list + creation |
+| `/tasks/{id}` | Task detail + logs |
+| `/proxies` | Proxy management |
+| `/system` | System health + logs |
+
+### Dashboard HTMX Partials
+| Route | Purpose |
+|-------|---------|
+| `/htmx/queue-status` | Queue status pill |
+| `/htmx/stats` | Stats cards |
 
 ---
 
