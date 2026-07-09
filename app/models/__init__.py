@@ -53,7 +53,6 @@ class Account(Base):
 
     votes_today = Column(Integer, default=0)
     votes_this_week = Column(Integer, default=0)
-    total_votes = Column(Integer, default=0)
     last_vote_at = Column(DateTime, nullable=True)
 
     active_hours_start = Column(Integer, default=7)
@@ -170,12 +169,6 @@ class Task(Base):
         back_populates="task",
         order_by="TaskExecutionLog.created_at",
     )
-
-    @validates("workers_needed")
-    def validate_workers_needed(self, key, value):
-        if value < 1:
-            raise ValueError("workers_needed must be a positive integer")
-        return value
 
 
 class TaskExecutionLog(Base):

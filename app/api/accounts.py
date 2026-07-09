@@ -27,7 +27,6 @@ from app.schemas.account import (
     BatchImportRequest,
     BatchDeleteRequest,
     LoginRequest,
-    BatchLoginRequest,
 )
 from app.schemas.common import SuccessResponse
 
@@ -339,118 +338,6 @@ async def login_accounts(
 
     succeeded = len([r for r in results if r.get("success")])
     logger.info(f"Login complete: {succeeded}/{len(accounts)} succeeded")
-    return SuccessResponse(
-        data={
-            "total": len(accounts),
-            "logged_in": succeeded,
-            "failed": len(results) - succeeded,
-            "results": results,
-        }
-    )
-
-
-@router.post("/login/simple", response_model=SuccessResponse)
-async def login_simple(
-    request: dict,
-    db: Session = Depends(get_db),
-):
-    """Login with username and password directly (no account ID needed)."""
-    from app.modules.accounts.login import LoginService
-
-    username = request.get("username")
-    password = request.get("password")
-    headless = request.get("headless", False)
-
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="username and password required")
-
-    service = LoginService()
-    success, time_ms = await service.login(
-        username=username,
-        password=password,
-        force=True,
-        headless=headless,
-    )
-
-    return SuccessResponse(
-        data={
-            "success": success,
-            "username": username,
-            "time_ms": time_ms,
-        }
-    )
-
-
-@router.post("/login/batch", response_model=SuccessResponse)
-async def batch_login_accounts(
-    request: BatchLoginRequest,
-    db: Session = Depends(get_db),
-):
-    query = db.query(Account)
-
-    if request.filters.get("status"):
-        try:
-            query = query.filter(
-                Account.status == AccountStatus[request.filters["status"]]
-            )
-        except KeyError:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid status: {request.filters['status']}"
-            )
-    if request.filters.get("type"):
-        try:
-            query = query.filter(
-                Account.account_type == AccountType[request.filters["type"]]
-            )
-        except KeyError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid account type: {request.filters['type']}",
-            )
-
-    accounts = query.all()
-    if not accounts:
-        raise HTTPException(status_code=404, detail="No accounts found")
-
-    from app.modules.accounts.login import LoginService
-
-    service = LoginService()
-    results = []
-
-    for account in accounts:
-        try:
-            success, time_ms = await service.login(
-                username=account.username,
-                password=account.password,
-                proxy=account.proxy,
-                force=request.force,
-                headless=request.options.get("headless", False)
-                if request.options
-                else False,
-            )
-            if success:
-                account.status = AccountStatus.logged_in
-                account.last_login = datetime.now(UTC)
-                db.commit()
-            results.append(
-                {
-                    "account_id": account.id,
-                    "username": account.username,
-                    "success": success,
-                    "time_ms": time_ms,
-                }
-            )
-        except Exception as e:
-            results.append(
-                {
-                    "account_id": account.id,
-                    "username": account.username,
-                    "success": False,
-                    "error": str(e),
-                }
-            )
-
-    succeeded = len([r for r in results if r.get("success")])
     return SuccessResponse(
         data={
             "total": len(accounts),

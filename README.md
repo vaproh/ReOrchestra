@@ -78,9 +78,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 | `just run`        | Start production server   |
 | `just dev`        | Start with auto-reload    |
 | `just debug`      | Start with DEBUG logging  |
+| `just test`       | Run tests                 |
+| `just lint`       | Lint code                |
+| `just fmt`        | Format code              |
 | `just logs`       | Tail logs                 |
 | `just logs-clear` | Clear logs                |
 | `just clean`      | Clean cache               |
+| `just cleanup`    | Full cleanup (removes venv + data) |
 
 ---
 

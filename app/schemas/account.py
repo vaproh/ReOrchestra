@@ -11,10 +11,6 @@ class AccountBase(BaseModel):
     account_type: str = "upvoter"
 
 
-class AccountCreate(AccountBase):
-    pass
-
-
 class AccountImport(AccountBase):
     pass
 
@@ -65,11 +61,5 @@ class BatchDeleteRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     account_ids: list[int]
-    force: bool = False
-    options: Optional[dict] = None
-
-
-class BatchLoginRequest(BaseModel):
-    filters: dict
     force: bool = False
     options: Optional[dict] = None

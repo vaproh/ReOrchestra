@@ -132,7 +132,7 @@
             <td class="px-6 py-3 text-gray-500 dark:text-gray-400">{{ account.karma_total | default(0) | int }}</td>
             <td class="px-6 py-3">
               <span class="text-gray-400">{{ account.votes_today | default(0) }}</span>
-              <span class="text-gray-300">/{{ account.votes_week | default(0) }}wk</span>
+              <span class="text-gray-300">/{{ account.votes_this_week | default(0) }}wk</span>
             </td>
             <td class="px-6 py-3 text-gray-400 text-xs whitespace-nowrap">
               {{ account.last_used[:16] | replace('T', ' ') if account.last_used else '—' }}
@@ -332,8 +332,7 @@
         username: parts[0] || '',
         password: parts[1] || '',
         email: parts[2] || null,
-        email_password: parts[3] || null,
-        proxy: parts[4] || null,
+        proxy: parts[3] || null,
       };
     }).filter(a => a.username && a.password);
 

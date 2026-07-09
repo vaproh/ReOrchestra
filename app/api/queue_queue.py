@@ -13,39 +13,6 @@ logger = logging.getLogger("queue_api")
 router = APIRouter()
 
 
-@router.get("", response_model=SuccessResponse)
-async def view_queue(db: Session = Depends(get_db)):
-    tasks = (
-        db.query(Task)
-        .filter(Task.status.in_([TaskStatus.queued, TaskStatus.running]))
-        .order_by(Task.priority.desc(), Task.created_at.asc())
-        .all()
-    )
-    manager = QueueManager.get()
-    return SuccessResponse(
-        data={
-            "total": len(tasks),
-            "processing": manager.is_running(),
-            "tasks": [
-                {
-                    "id": t.id,
-                    "position": i + 1,
-                    "action_type": t.action_type,
-                    "target_url": t.target_url,
-                    "workers_needed": t.workers_needed,
-                    "workers_completed": t.workers_completed or 0,
-                    "workers_failed": t.workers_failed or 0,
-                    "status": t.status.value,
-                    "priority": t.priority,
-                    "created_at": t.created_at.isoformat() if t.created_at else None,
-                    "started_at": t.started_at.isoformat() if t.started_at else None,
-                }
-                for i, t in enumerate(tasks)
-            ],
-        }
-    )
-
-
 @router.post("/start", response_model=SuccessResponse)
 async def start_queue():
     logger.info("Queue start requested")
