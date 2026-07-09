@@ -1,5 +1,19 @@
 # ReOrchestra - Command Runner
 
+# Show available commands
+default:
+    @echo "Available commands:"
+    @echo "  just install   - Install dependencies"
+    @echo "  just dev       - Start dev server with auto-reload"
+    @echo "  just run       - Start production server"
+    @echo "  just debug     - Start with debug logging"
+    @echo "  just test      - Run tests"
+    @echo "  just lint      - Lint code"
+    @echo "  just fmt       - Format code"
+    @echo "  just logs      - Tail logs"
+    @echo "  just clean     - Clean cache"
+    @echo "  just cleanup   - Full cleanup"
+
 # Install dependencies
 install:
     uv sync
