@@ -85,6 +85,34 @@ Request → FastAPI → Task Queue (SQLite)
 
 ---
 
+## Dashboard
+
+Web UI at `http://localhost:8000` built with HTMX + Jinja2 + Tailwind + Flowbite.
+
+### Pages
+
+| Route | Purpose |
+|-------|---------|
+| `/dashboard` | Stats overview, queue control, recent activity |
+| `/accounts` | Account list, import, login, delete |
+| `/tasks` | Task list, create task, cancel/retry |
+| `/tasks/{id}` | Task detail with execution logs |
+| `/proxies` | Proxy list, import, mark dead |
+| `/system` | System health, log streaming |
+
+### Tech Stack
+- **Templates**: Jinja2 with FastHX helpers
+- **Styling**: Tailwind CSS + Flowbite components
+- **Interactivity**: HTMX with auto-refresh
+
+### HTMX Patterns
+- Forms submit via HTMX to API endpoints
+- Auto-refresh stats every 30s
+- Running tasks auto-refresh every 5s
+- Delete/cancel with confirmation dialogs
+
+---
+
 ## Project Structure
 
 ```
@@ -107,6 +135,7 @@ app/
 │   ├── queue_queue.py       # /api/queue/*
 │   ├── proxies.py          # /api/proxies/*
 │   ├── admin.py            # /api/admin/*
+│   ├── frontend.py         # /dashboard, /accounts, /tasks, /proxies
 │   └── router.py           # Central router
 │
 ├── models/                   # SQLAlchemy models
@@ -114,7 +143,17 @@ app/
 │
 ├── schemas/                  # Pydantic schemas
 │   ├── account.py
-│   └── common.py
+│   ├── common.py
+│   └── proxy.py
+│
+├── templates/                # Jinja2 templates (HTMX + Flowbite)
+│   ├── base.html
+│   ├── pages/              # dashboard, accounts, tasks, proxies
+│   └── components/         # stat_card, status_badge, modal, etc.
+│
+├── static/                   # CSS, JS
+│   └── css/
+│       └── custom.css
 │
 └── modules/
     ├── accounts/            # Account management
@@ -357,9 +396,16 @@ Commands via [`just`](https://just.systems/):
 | `just run` | Start production server |
 | `just dev` | Start with auto-reload |
 | `just debug` | Start with DEBUG logging |
+| `just test` | Run tests |
+| `just lint` | Lint code |
+| `just fmt` | Format code |
 | `just logs` | Tail logs |
 | `just logs-clear` | Clear logs |
 | `just clean` | Clean cache |
+| `just cleanup` | Full cleanup (removes venv + data) |
+
+Dashboard: `http://localhost:8000`
+API docs: `http://localhost:8000/docs`
 
 ---
 

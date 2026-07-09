@@ -13,6 +13,7 @@ Bulk Reddit account automation for managing 500-1000 accounts on a single VPS.
 
 | Feature             | Description                                        |
 | :------------------ | :------------------------------------------------- |
+| **Web Dashboard**   | HTMX + Jinja2 UI at `http://localhost:8000`      |
 | **Queue System**    | Task-based: specify action + URL + accounts needed |
 | **9 Actions**       | Upvote/downvote, follow/unfollow, join/leave, save |
 | **Camofox Browser** | Stealth headless browser with fingerprint spoofing |
@@ -35,12 +36,12 @@ Bulk Reddit account automation for managing 500-1000 accounts on a single VPS.
 
 ```bash
 # 1. Clone
-cd reddit-api
+cd ReOrchestra
 
 # 2. Install uv (one-time)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 3. Install dependencies
+# 3. Install dependencies (including dev)
 just install
 
 # 4. Configure
@@ -50,11 +51,13 @@ cp .env.example .env
 ### Run
 
 ```bash
-just dev      # 🚀 Start with auto-reload
+just dev      # 🚀 Start with auto-reload + dashboard
 just run      # 🏭 Start production server
 just debug    # 🔍 Start with DEBUG logging
 just logs     # 📋 Tail logs
 ```
+
+Dashboard: `http://localhost:8000`
 
 Or manually:
 
@@ -211,27 +214,30 @@ Request → FastAPI → Task Queue → QueueProcessor → Executor → Camofox �
 ## 📁 Project Structure
 
 ```
-reddit-api/
+ReOrchestra/
 ├── app/
 │   ├── main.py              # FastAPI entry
 │   ├── config.py           # Settings
 │   ├── database.py         # SQLAlchemy
-│   ├── logging/            # Logging utilities
-│   │   ├── redact.py       # Sensitive data redaction
-│   │   └── timing.py      # Performance tracking
-│   ├── api/                # Routers
+│   ├── api/                # API routers
 │   │   ├── accounts.py
 │   │   ├── queue_tasks.py
 │   │   ├── queue_queue.py
 │   │   ├── proxies.py
-│   │   └── admin.py
+│   │   ├── admin.py
+│   │   └── frontend.py     # Dashboard routes
 │   ├── models/             # DB models
 │   ├── schemas/            # Pydantic schemas
+│   ├── templates/           # Jinja2 templates
+│   │   ├── base.html
+│   │   ├── pages/          # Dashboard pages
+│   │   └── components/     # Reusable components
+│   ├── static/             # CSS, JS
 │   └── modules/
 │       ├── accounts/        # Account service + login
 │       ├── queue/           # QueueProcessor
 │       └── executor/        # Camofox + actions
-├── config/                 # YAML config
+├── tests/                   # 93 tests
 ├── data/                    # SQLite + sessions + logs
 ├── justfile                # Command runner
 └── pyproject.toml         # Dependencies

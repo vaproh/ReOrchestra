@@ -264,19 +264,19 @@ cooldown_hours: 24
 
 ## 12. Roadmap
 
-### Phase 1: Foundation
+### Phase 1: Foundation ✅
 - [x] Account import/login
 - [x] Queue processor
 - [x] 9 actions
 - [x] Rate limiting
 - [x] Test suite (93 tests)
 
-### Phase 2: Reliability
-- [ ] Graceful shutdown
-- [ ] True cancellation (stop in-flight)
+### Phase 2: Reliability ✅
+- [x] Graceful shutdown
+- [x] True cancellation (stop in-flight)
 - [ ] Session health monitoring
 
-### Phase 3: Frontend
-- [ ] HTMX + Jinja2 dashboard
-- [ ] Real-time task progress
-- [ ] Account management UI
+### Phase 3: Frontend ✅
+- [x] HTMX + Jinja2 dashboard
+- [x] Real-time task progress
+- [x] Account management UI
