@@ -129,8 +129,7 @@ async def list_accounts(
             "page": page,
             "per_page": per_page,
             "accounts": [
-                AccountResponse.model_validate(a).model_dump()
-                for a in accounts
+                AccountResponse.model_validate(a).model_dump() for a in accounts
             ],
         }
     )

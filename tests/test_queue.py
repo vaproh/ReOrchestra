@@ -19,7 +19,6 @@ import pytest
 import threading
 import time
 from datetime import datetime, timedelta, UTC
-from unittest.mock import patch, MagicMock
 
 
 class TestQueueSetup:

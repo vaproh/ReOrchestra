@@ -199,14 +199,18 @@ async def get_stats(db: Session = Depends(get_db)):
 async def log_generator(request: Request):
     """Yields log lines via Server-Sent Events"""
     import app.logging_config as log_cfg
-    
+
     if not log_cfg.LOG_FILE or not log_cfg.LOG_FILE.exists():
         yield "data: Log file not found\n\n"
         return
 
     # Using tail -f to stream the log file
     process = await asyncio.create_subprocess_exec(
-        "tail", "-n", "150", "-f", str(log_cfg.LOG_FILE),
+        "tail",
+        "-n",
+        "150",
+        "-f",
+        str(log_cfg.LOG_FILE),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -215,15 +219,15 @@ async def log_generator(request: Request):
         while True:
             if await request.is_disconnected():
                 break
-            
+
             line = await process.stdout.readline()
             if not line:
                 break
-                
+
             decoded = line.decode("utf-8").strip()
             if decoded:
                 yield f"data: {decoded}\n\n"
-                
+
     except asyncio.CancelledError:
         pass
     finally:
@@ -241,5 +245,8 @@ async def stream_logs(request: Request):
 @router.post("/logs/level", response_model=SuccessResponse)
 async def change_log_level(level: str = Form(...)):
     from app.logging_config import set_dynamic_log_level
+
     set_dynamic_log_level(level)
-    return SuccessResponse(data={"message": f"Log level dynamically set to {level.upper()}"})
+    return SuccessResponse(
+        data={"message": f"Log level dynamically set to {level.upper()}"}
+    )

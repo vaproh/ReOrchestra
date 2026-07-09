@@ -1,5 +1,4 @@
 from app.schemas.account import (
-    AccountBase,
     AccountImport,
     AccountResponse,
     AccountDetailResponse,

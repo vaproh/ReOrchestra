@@ -284,12 +284,6 @@ class MockCamofoxClient:
         self.calls.append({"method": "create_tab", "url": url, "tab_id": tab_id})
         return tab
 
-    def navigate(self, tab: Tab, url: str, wait: float = 5.0) -> str:
-        """Mock navigate."""
-        self._tab_urls[tab.tab_id] = url
-        self.calls.append({"method": "navigate", "tab_id": tab.tab_id, "url": url})
-        return url
-
     def wait(self, tab: Tab, timeout: int = 5000, wait_network: bool = True) -> dict:
         """Mock wait."""
         self.calls.append({"method": "wait", "tab_id": tab.tab_id, "timeout": timeout})
@@ -308,12 +302,6 @@ class MockCamofoxClient:
         if url:
             self._tab_urls[tab.tab_id] = url
 
-    def snapshot(
-        self, tab: Tab, wait_ready: bool = True, timeout: int = 5000
-    ) -> tuple[str, str]:
-        """Mock snapshot."""
-        return self.snapshot_quick(tab)
-
     def type_text(self, tab: Tab, ref: str, text: str, delay: float = 0.5) -> None:
         """Mock type_text."""
         self.calls.append({"method": "type_text", "tab_id": tab.tab_id, "ref": ref})
@@ -322,20 +310,10 @@ class MockCamofoxClient:
         """Mock click."""
         self.calls.append({"method": "click", "tab_id": tab.tab_id, "ref": ref})
 
-    def scroll(
-        self, tab: Tab, direction: str = "down", amount: int = 800, delay: float = 1.0
-    ) -> None:
-        """Mock scroll."""
-        self.calls.append({"method": "scroll", "tab_id": tab.tab_id})
-
     def close_tab(self, tab: Tab) -> None:
         """Mock close_tab."""
         self.calls.append({"method": "close_tab", "tab_id": tab.tab_id})
         self._tabs.pop(tab.tab_id, None)
-
-    def health(self) -> dict:
-        """Mock health check."""
-        return {"ok": True, "status": "running"}
 
     def set_user_proxy(self, user_id: str, proxy: str) -> dict:
         """Mock set_user_proxy."""
@@ -398,12 +376,6 @@ class MockRateLimiter:
 
     def get_stats(self, account) -> dict:
         return {"votes_today": 0, "votes_this_week": 0}
-
-    def reset(self):
-        self.denied_accounts.clear()
-        self.denied_reasons.clear()
-        self.check_count = 0
-        self.vote_record_count = 0
 
 
 # =============================================================================

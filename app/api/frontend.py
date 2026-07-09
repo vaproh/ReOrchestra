@@ -24,10 +24,10 @@ _jinja_env = jinja2.Environment(
 templates = Jinja2Templates(env=_jinja_env)
 
 
-
 # ---------------------------------------------------------------------------
 # Helper: fetch data from DB directly (avoids HTTP round-trip to self)
 # ---------------------------------------------------------------------------
+
 
 def _get_admin_stats(db: Session) -> dict:
     from sqlalchemy import func
@@ -43,7 +43,8 @@ def _get_admin_stats(db: Session) -> dict:
     alive_accounts = (
         db.query(func.count(Account.id))
         .filter(Account.status.in_([AccountStatus.fresh, AccountStatus.logged_in]))
-        .scalar() or 0
+        .scalar()
+        or 0
     )
     dead_accounts = total_accounts - alive_accounts
 
@@ -55,7 +56,8 @@ def _get_admin_stats(db: Session) -> dict:
     by_type = {}
     for at in AccountType:
         by_type[at.value] = (
-            db.query(func.count(Account.id)).filter(Account.account_type == at).scalar() or 0
+            db.query(func.count(Account.id)).filter(Account.account_type == at).scalar()
+            or 0
         )
 
     total_proxies = db.query(func.count(Proxy.id)).scalar() or 0
@@ -93,8 +95,12 @@ def _get_queue_status(db: Session) -> dict:
     from app.models import AccountStatus
 
     manager = QueueManager.get()
-    logged_in = db.query(Account).filter(Account.status == AccountStatus.logged_in).count()
-    rate_limited = db.query(Account).filter(Account.status == AccountStatus.rate_limited).count()
+    logged_in = (
+        db.query(Account).filter(Account.status == AccountStatus.logged_in).count()
+    )
+    rate_limited = (
+        db.query(Account).filter(Account.status == AccountStatus.rate_limited).count()
+    )
     dead = db.query(Account).filter(Account.status == AccountStatus.dead).count()
     queued_count = db.query(Task).filter(Task.status == TaskStatus.queued).count()
     running_count = db.query(Task).filter(Task.status == TaskStatus.running).count()
@@ -117,6 +123,7 @@ def _get_queue_status(db: Session) -> dict:
 def _get_health() -> dict:
     """Return a minimal health dict without hitting the real HTTP endpoint."""
     from app.config import get_settings
+
     settings = get_settings()
     return {
         "success": True,
@@ -150,28 +157,30 @@ def _task_dict(t: Task) -> dict:
 # HTMX partial: queue status pill (used in base.html sidebar)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/htmx/queue-status", response_class=HTMLResponse)
 async def htmx_queue_status(request: Request, db: Session = Depends(get_db)):
     qs = _get_queue_status(db)
     processing = qs["data"]["processing"]
     if processing:
-        html = '''<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
+        html = """<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
                         class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-900/30 border border-green-800/30 transition-colors">
                     <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
                     <span class="text-green-400 text-xs font-medium">Queue Running</span>
-                  </div>'''
+                  </div>"""
     else:
-        html = '''<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
+        html = """<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
                         class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/20 border border-red-800/20 transition-colors">
                     <div class="w-2 h-2 rounded-full bg-red-400"></div>
                     <span class="text-red-400 text-xs font-medium">Queue Stopped</span>
-                  </div>'''
+                  </div>"""
     return HTMLResponse(html)
 
 
 # ---------------------------------------------------------------------------
 # HTMX partial: stats section (auto-refreshed every 30s from dashboard)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/htmx/stats", response_class=HTMLResponse)
 async def htmx_stats(request: Request, db: Session = Depends(get_db)):
@@ -188,6 +197,7 @@ async def htmx_stats(request: Request, db: Session = Depends(get_db)):
 # Pages
 # ---------------------------------------------------------------------------
 
+
 @router.get("/", response_class=RedirectResponse)
 async def root():
     return RedirectResponse(url="/dashboard")
@@ -199,13 +209,11 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     queue_status = _get_queue_status(db)
     health_data = _get_health()
 
-    tasks_q = (
-        db.query(Task)
-        .order_by(Task.created_at.desc())
-        .limit(10)
-        .all()
-    )
-    recent_tasks = {"success": True, "data": {"tasks": [_task_dict(t) for t in tasks_q]}}
+    tasks_q = db.query(Task).order_by(Task.created_at.desc()).limit(10).all()
+    recent_tasks = {
+        "success": True,
+        "data": {"tasks": [_task_dict(t) for t in tasks_q]},
+    }
 
     return templates.TemplateResponse(
         request,
@@ -241,7 +249,12 @@ async def accounts_page(
         q = q.filter(Account.username.ilike(f"%{search}%"))
 
     total = q.count()
-    accs = q.order_by(Account.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    accs = (
+        q.order_by(Account.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
 
     def acc_dict(a: Account) -> dict:
         return {
@@ -296,7 +309,12 @@ async def tasks_page(
             pass
 
     total = q.count()
-    tasks = q.order_by(Task.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    tasks = (
+        q.order_by(Task.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
 
     tasks_data = {
         "success": True,
@@ -424,14 +442,14 @@ async def system_page(request: Request, db: Session = Depends(get_db)):
     import platform
     import os
     import psutil
-    
+
     # Get camofox and general health status
     health_resp = await health_check()
     health_data = health_resp.data
-    
+
     # Get db, proxy, and queue stats
     stats_data = _get_admin_stats(db)["data"]
-    
+
     # Distro info
     try:
         os_info = platform.freedesktop_os_release()
@@ -444,8 +462,8 @@ async def system_page(request: Request, db: Session = Depends(get_db)):
     # Memory
     mem = psutil.virtual_memory()
     # Disk (check the partition where the app resides instead of root)
-    disk = psutil.disk_usage(os.path.abspath('.'))
-    
+    disk = psutil.disk_usage(os.path.abspath("."))
+
     # CPU Load
     cpu_cores = psutil.cpu_count(logical=True)
     try:
@@ -456,7 +474,7 @@ async def system_page(request: Request, db: Session = Depends(get_db)):
     except AttributeError:
         load_str = "N/A"
         cpu_percent = psutil.cpu_percent(interval=None)
-        
+
     host_info = {
         "os": distro_name,
         "release": distro_version,
@@ -466,15 +484,15 @@ async def system_page(request: Request, db: Session = Depends(get_db)):
         "ram": {
             "total_gb": round(mem.total / (1024**3), 2),
             "used_gb": round(mem.used / (1024**3), 2),
-            "percent": mem.percent
+            "percent": mem.percent,
         },
         "disk": {
             "total_gb": round(disk.total / (1024**3), 2),
             "used_gb": round(disk.used / (1024**3), 2),
-            "percent": disk.percent
-        }
+            "percent": disk.percent,
+        },
     }
-    
+
     return templates.TemplateResponse(
         request,
         "pages/system.html",

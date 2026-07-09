@@ -54,7 +54,7 @@ app/
 ├── templates/               # Jinja2 templates (HTMX + Flowbite)
 │   ├── base.html
 │   ├── pages/             # dashboard, accounts, tasks, proxies
-│   └── components/         # stat_card, status_badge, modal
+│   └── components/         # stat_card, status_badge, progress_bar
 │
 ├── static/                  # CSS, JS
 │   └── css/

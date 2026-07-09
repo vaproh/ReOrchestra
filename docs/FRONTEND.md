@@ -59,9 +59,7 @@ app/
 │   └── components/
 │       ├── stat_card.html      # Dashboard stat cards
 │       ├── status_badge.html   # Status badges
-│       ├── progress_bar.html   # Task progress
-│       ├── modal.html          # Modal wrapper
-│       └── flash_messages.html # Toast notifications
+│       └── progress_bar.html   # Task progress
 └── static/
     └── css/
         └── custom.css          # Custom styles

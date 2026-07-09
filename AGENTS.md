@@ -122,13 +122,6 @@ app/
 ├── database.py               # SQLAlchemy engine, get_db
 ├── logging_config.py         # Logging setup
 │
-├── logging/                  # Logging utilities
-│   ├── __init__.py
-│   ├── audit.py             # audit() for audit trail
-│   ├── redact.py            # redact_password(), redact_proxy()
-│   ├── structured.py        # StructuredFormatter
-│   └── timing.py           # timed_operation() context manager
-│
 ├── api/                      # FastAPI routers
 │   ├── accounts.py           # /api/accounts/*
 │   ├── queue_tasks.py       # /api/tasks/*
@@ -231,10 +224,6 @@ app/
 | `app/modules/executor/browser.py` | CamofoxClient |
 | `app/modules/accounts/login.py` | LoginService |
 | `app/modules/executor/rate_limiter.py` | RateLimiter |
-| `app/logging/__init__.py` | Logging utilities exports |
-| `app/logging/redact.py` | Sensitive data redaction |
-| `app/logging/timing.py` | Performance tracking |
-| `app/logging/audit.py` | Audit trail logging |
 
 ---
 
@@ -415,7 +404,7 @@ API docs: `http://localhost:8000/docs`
 cd ReOrchestra && uv run pytest tests/ -v
 ```
 
-**93 tests** across 4 test files:
+**91 tests** across 4 test files:
 
 | File | Tests | Coverage |
 |------|-------|----------|

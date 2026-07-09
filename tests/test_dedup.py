@@ -11,7 +11,6 @@ Covers:
 """
 
 import pytest
-from datetime import datetime
 
 
 class TestDeduplication:

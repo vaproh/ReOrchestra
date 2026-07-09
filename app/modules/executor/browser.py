@@ -54,21 +54,6 @@ class CamofoxClient:
             session_key=self.session_key,
         )
 
-    def navigate(self, tab: Tab, url: str, wait: float = 5.0) -> str:
-        logger.debug(
-            f"navigate tab={tab.tab_id} url={url}",
-            extra={"tab_id": tab.tab_id, "url": url},
-        )
-        resp = requests.post(
-            self._url(f"/tabs/{tab.tab_id}/navigate"),
-            json={"userId": tab.user_id, "url": url},
-            timeout=self._settings.timeout_camofox_navigate,
-        )
-        resp.raise_for_status()
-        time.sleep(wait)
-        result_url = resp.json().get("url", "")
-        return result_url
-
     def wait(self, tab: Tab, timeout: int = 5000, wait_network: bool = True) -> dict:
         """Wait for page readiness via POST /tabs/:tabId/wait."""
         logger.debug(
@@ -109,14 +94,6 @@ class CamofoxClient:
         )
         return data.get("snapshot", ""), data.get("url", "")
 
-    def snapshot(
-        self, tab: Tab, wait_ready: bool = True, timeout: int = 5000
-    ) -> tuple[str, str]:
-        """Returns (snapshot_text, current_url). Optionally waits for page readiness first."""
-        if wait_ready:
-            self.wait(tab, timeout=timeout, wait_network=True)
-        return self.snapshot_quick(tab)
-
     def type_text(self, tab: Tab, ref: str, text: str, delay: float = 0.5) -> None:
         logger.debug(
             f"browser | type_text | tab_id={tab.tab_id} ref={ref} text_len={len(text)}"
@@ -142,20 +119,6 @@ class CamofoxClient:
         resp.raise_for_status()
         time.sleep(delay)
 
-    def scroll(
-        self, tab: Tab, direction: str = "down", amount: int = 800, delay: float = 1.0
-    ) -> None:
-        logger.debug(
-            f"browser | scroll | tab_id={tab.tab_id} direction={direction} amount={amount}"
-        )
-        resp = requests.post(
-            self._url(f"/tabs/{tab.tab_id}/scroll"),
-            json={"userId": tab.user_id, "direction": direction, "amount": amount},
-            timeout=self._settings.timeout_camofox_scroll,
-        )
-        resp.raise_for_status()
-        time.sleep(delay)
-
     def close_tab(self, tab: Tab) -> None:
         logger.debug(f"close_tab tab={tab.tab_id}", extra={"tab_id": tab.tab_id})
         try:
@@ -168,13 +131,6 @@ class CamofoxClient:
             logger.warning(
                 f"Browser error: {e}", extra={"error": str(e)}, exc_info=True
             )
-
-    def health(self) -> dict:
-        logger.debug("browser | health_check")
-        resp = requests.get(
-            self._url("/"), timeout=self._settings.timeout_camofox_health
-        )
-        return resp.json()
 
     def set_user_proxy(self, user_id: str, proxy: str) -> dict:
         """Assign proxy to user via sticky-proxy plugin."""

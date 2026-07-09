@@ -99,55 +99,6 @@ class QueueProcessor:
     # Public API (called from API routes via QueueManager)
     # ------------------------------------------------------------------
 
-    def create_task(
-        self, db: Session, action_type: str, target_url: str, workers_needed: int = 1
-    ) -> Task:
-        if not get_action_class(action_type):
-            raise ValueError(f"Unknown action type: {action_type}")
-        task = Task(
-            action_type=action_type,
-            target_url=target_url,
-            workers_needed=workers_needed,
-            status=TaskStatus.queued,
-        )
-        db.add(task)
-        db.commit()
-        db.refresh(task)
-        return task
-
-    def cancel_task(self, db: Session, task_id: int) -> Task:
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            raise ValueError("Task not found")
-        if task.status in (TaskStatus.completed, TaskStatus.cancelled):
-            return task
-        task.status = TaskStatus.cancelled
-        task.completed_at = datetime.now(UTC)
-        # Signal the running thread to abort this task
-        evt = self._cancel_events.get(task_id)
-        if evt:
-            evt.set()
-        db.commit()
-        db.refresh(task)
-        return task
-
-    def priority_boost(self, db: Session, task_id: int) -> Task:
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            raise ValueError("Task not found")
-        task.priority = (task.priority or 0) + 1000
-        db.commit()
-        db.refresh(task)
-        return task
-
-    def list_queue(self, db: Session) -> list[Task]:
-        return (
-            db.query(Task)
-            .filter(Task.status.in_([TaskStatus.queued, TaskStatus.running]))
-            .order_by(Task.priority.desc(), Task.created_at.asc())
-            .all()
-        )
-
     def is_running(self) -> bool:
         return (
             self._thread is not None

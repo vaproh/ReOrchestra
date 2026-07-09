@@ -538,30 +538,6 @@ class TestAccountStatusTransitions:
 class TestAccountHealthTracking:
     """Test account health metrics tracking."""
 
-    def test_fail_count_incremented(self, db_session, logged_in_account):
-        """fail_count should increment on failures."""
-        logged_in_account.fail_count = 5
-        logged_in_account.consecutive_failures = 3
-        db_session.commit()
-
-        logged_in_account.fail_count += 1
-        logged_in_account.consecutive_failures += 1
-        db_session.commit()
-
-        db_session.refresh(logged_in_account)
-        assert logged_in_account.fail_count == 6
-        assert logged_in_account.consecutive_failures == 4
-
-    def test_last_failure_recorded(self, db_session, logged_in_account):
-        """last_failure_at should be set on failure."""
-        now = datetime.now(UTC).replace(tzinfo=None)
-        logged_in_account.last_failure_at = now
-        logged_in_account.consecutive_failures = 1
-        db_session.commit()
-
-        db_session.refresh(logged_in_account)
-        assert logged_in_account.last_failure_at == now
-
     def test_dead_reason_stored(self, db_session, logged_in_account):
         """dead_reason should store why account was marked dead."""
         logged_in_account.status = logged_in_account.status.__class__.dead

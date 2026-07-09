@@ -23,7 +23,7 @@ Covers:
 """
 
 import pytest
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 
 
 class TestTaskCreation:
@@ -480,7 +480,3 @@ class TestTaskProgressTracking:
         db_session.refresh(queued_task)
         assert queued_task.status == TaskStatus.partial
         assert queued_task.workers_completed == 5
-
-
-# Helper for timedelta
-from datetime import timedelta
