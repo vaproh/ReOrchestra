@@ -56,7 +56,6 @@ async def import_accounts(
         account = Account(
             username=acc_data.username,
             password=acc_data.password,
-            email=acc_data.email,
             proxy=acc_data.proxy,
             account_type=AccountType[request.account_type],
             status=AccountStatus.fresh,

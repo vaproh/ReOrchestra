@@ -6,7 +6,6 @@ from typing import Optional
 class AccountBase(BaseModel):
     username: str = Field(..., min_length=1, max_length=20)
     password: str
-    email: Optional[str] = None
     proxy: Optional[str] = None
     account_type: str = "upvoter"
 

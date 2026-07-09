@@ -331,8 +331,7 @@
       return {
         username: parts[0] || '',
         password: parts[1] || '',
-        email: parts[2] || null,
-        proxy: parts[3] || null,
+        proxy: parts[2] || null,
       };
     }).filter(a => a.username && a.password);
 
