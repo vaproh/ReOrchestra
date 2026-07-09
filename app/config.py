@@ -22,10 +22,6 @@ class Settings(BaseSettings):
     camofox_port: int = 9377
     camofox_dir: str = "../camofox"
 
-    # ===== PROXY =====
-    proxy_mode: str = "sticky"
-    use_proxies_by_default: bool = True
-
     # ===== VNC =====
     vnc_enabled: bool = False
     vnc_port: int = 5999

@@ -193,8 +193,6 @@ curl http://localhost:8000/api/tasks              # List tasks
 | `LOG_DIR`             | `data/logs`                  | Log directory                           |
 | `CAMOFOX_PORT`        | `9377`                       | Camofox port                            |
 | `CAMOFOX_DIR`         | `../camofox`                 | Camofox installation path               |
-| `PROXY_MODE`          | `sticky`                     | Proxy mode (`sticky` or `dynamic`)      |
-| `USE_PROXIES_BY_DEFAULT` | `true`                   | Inject proxies into sessions by default |
 | `VNC_ENABLED`         | `false`                      | Enable VNC server                       |
 | `ACTION_DELAY_MS_MIN` | `1000`                       | Min delay between actions (ms)          |
 | `ACTION_DELAY_MS_MAX` | `3000`                       | Max delay between actions (ms)          |
