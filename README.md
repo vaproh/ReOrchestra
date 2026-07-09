@@ -6,6 +6,8 @@ Bulk Reddit account automation for managing 500-1000 accounts on a single VPS.
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/fastapi-0.100+-green.svg)](https://fastapi.tiangolo.com)
+[![Tests](https://img.shields.io/badge/tests-93%20passed-brightgreen)]()
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
 
 ---
 
