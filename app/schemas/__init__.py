@@ -4,7 +4,6 @@ from app.schemas.account import (
     AccountImport,
     AccountResponse,
     AccountDetailResponse,
-    AccountSessionResponse,
     BatchImportRequest,
     BatchDeleteRequest,
     LoginRequest,

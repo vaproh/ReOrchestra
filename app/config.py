@@ -15,9 +15,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     # ===== PATHS =====
-    proxy_file: str = "data/proxies.txt"
     database_url: str = "sqlite:///./data/reddit.db"
-    session_dir: str = "data/sessions"
     log_dir: str = "data/logs"
 
     # ===== CAMOFOX =====
@@ -31,9 +29,6 @@ class Settings(BaseSettings):
     # ===== VNC =====
     vnc_enabled: bool = False
     vnc_port: int = 5999
-
-    # ===== SESSION =====
-    max_session_age_hours: int = 72
 
     # ===== ACTION TIMING =====
     action_delay_ms_min: int = 1000

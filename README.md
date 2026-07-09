@@ -187,12 +187,19 @@ curl http://localhost:8000/api/tasks              # List tasks
 
 ### Environment Variables
 
-| Variable       | Default                      | Description                             |
-| :------------- | :--------------------------- | :-------------------------------------- |
-| `DATABASE_URL` | `sqlite:///./data/reddit.db` | Database                                |
-| `SESSION_DIR`  | `data/sessions`              | Cookie storage                          |
-| `CAMOFOX_PORT` | `9377`                       | Camofox port                            |
-| `LOG_LEVEL`    | `INFO`                       | Console log level (`DEBUG` for verbose) |
+| Variable              | Default                      | Description                             |
+| :-------------------- | :--------------------------- | :-------------------------------------- |
+| `DATABASE_URL`        | `sqlite:///./data/reddit.db` | Database                                |
+| `LOG_DIR`             | `data/logs`                  | Log directory                           |
+| `CAMOFOX_PORT`        | `9377`                       | Camofox port                            |
+| `CAMOFOX_DIR`         | `../camofox`                 | Camofox installation path               |
+| `PROXY_MODE`          | `sticky`                     | Proxy mode (`sticky` or `dynamic`)      |
+| `USE_PROXIES_BY_DEFAULT` | `true`                   | Inject proxies into sessions by default |
+| `VNC_ENABLED`         | `false`                      | Enable VNC server                       |
+| `ACTION_DELAY_MS_MIN` | `1000`                       | Min delay between actions (ms)          |
+| `ACTION_DELAY_MS_MAX` | `3000`                       | Max delay between actions (ms)          |
+| `LOG_LEVEL`           | `INFO`                       | Console log level (`DEBUG` for verbose)|
+| `CORS_ALLOWED_ORIGINS` | `*`                       | CORS allowed origins                    |
 
 ---
 

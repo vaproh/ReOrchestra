@@ -47,9 +47,6 @@ class AccountDetailResponse(BaseModel):
     email: Optional[str]
     email_verified: bool
     proxy: Optional[str]
-    cookies_present: bool = False
-    session_valid: bool = False
-    session_age_hours: Optional[float] = None
     last_used: Optional[datetime]
     last_login: Optional[datetime]
     fail_count: int
@@ -57,16 +54,6 @@ class AccountDetailResponse(BaseModel):
     recent_actions: list = []
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class AccountSessionResponse(BaseModel):
-    account_id: int
-    username: str
-    session_valid: bool
-    session_age_hours: Optional[float]
-    expires_in_hours: Optional[float]
-    cookies_exist: bool
-    last_login: Optional[datetime]
 
 
 class BatchImportRequest(BaseModel):

@@ -22,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Set test environment variables BEFORE any app imports
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault("SESSION_DIR", "/tmp/reorchestra_test_sessions")
 os.environ.setdefault("LOG_DIR", "/tmp/reorchestra_test_logs")
 os.environ.setdefault("LOG_LEVEL", "CRITICAL")
 

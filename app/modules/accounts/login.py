@@ -1,11 +1,9 @@
 import os
-import json
 import time
 import random
 import asyncio
 import re
 import logging
-from datetime import datetime, UTC
 from typing import Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -21,7 +19,6 @@ def _sleep(min_s: float, max_s: float):
 
 
 def _find_fields(snapshot: str):
-    """Find input field refs from accessibility snapshot."""
     refs = {}
     for match in re.findall(r'textbox "([^"]+)" \[(e\d+)\]', snapshot):
         refs[match[0]] = match[1]
@@ -31,7 +28,6 @@ def _find_fields(snapshot: str):
 
 
 def _find_button(snapshot: str, label: str):
-    """Get button ref by label (partial match)."""
     for match in re.findall(r'button "([^"]+)" \[(e\d+)\]', snapshot):
         if label.lower() in match[0].lower():
             return match[1]
@@ -41,7 +37,6 @@ def _find_button(snapshot: str, label: str):
 def _do_login_sync(
     username: str,
     password: str,
-    session_dir: str,
     proxy: Optional[str],
     user_id: str,
 ) -> Tuple[bool, int]:
@@ -63,15 +58,6 @@ def _do_login_sync(
             "welcome back" in snapshot.lower()
             and "already logged in" in snapshot.lower()
         ):
-            _save_session(
-                username,
-                session_dir,
-                {
-                    "username": username,
-                    "logged_in": True,
-                    "url": "https://www.reddit.com/",
-                },
-            )
             logger.debug(f"Session valid: {username}", extra={"username": username})
             return True, 1000
 
@@ -91,11 +77,6 @@ def _do_login_sync(
         snapshot, url = client.snapshot_quick(tab)
 
         if "login" not in url.lower():
-            _save_session(
-                username,
-                session_dir,
-                {"username": username, "logged_in": True, "url": url},
-            )
             elapsed_ms = int((time.time() - start_time) * 1000)
             logger.info(
                 f"Login success: {username} ({elapsed_ms}ms)",
@@ -122,15 +103,8 @@ def _do_login_sync(
             client.close_tab(tab)
 
 
-def _save_session(username: str, session_dir: str, data: dict):
-    session_path = os.path.join(session_dir, f"{username}.cookies")
-    with open(session_path, "w") as f:
-        json.dump(data, f)
-
-
 class LoginService:
     def __init__(self):
-        self.session_dir = get_settings().session_dir
         self._executor = ThreadPoolExecutor(max_workers=4)
 
     async def login(
@@ -141,13 +115,7 @@ class LoginService:
         force: bool = False,
         headless: bool = False,
     ) -> Tuple[bool, int]:
-        session_path = os.path.join(self.session_dir, f"{username}.cookies")
-
         has_proxy = proxy is not None
-        if not force and os.path.exists(session_path):
-            if self._validate_session(username):
-                logger.debug(f"Session valid: {username}", extra={"username": username})
-                return True, 0
 
         logger.info(
             f"Login attempt: {username}",
@@ -174,40 +142,7 @@ class LoginService:
             _do_login_sync,
             username,
             password,
-            self.session_dir,
             proxy,
             user_id,
         )
         return result
-
-    def _validate_session(self, username: str) -> bool:
-        session_path = os.path.join(self.session_dir, f"{username}.cookies")
-        if not os.path.exists(session_path):
-            return False
-        try:
-            file_age_hours = (
-                datetime.now(UTC)
-                - datetime.fromtimestamp(os.path.getmtime(session_path))
-            ).total_seconds() / 3600
-            if file_age_hours > get_settings().max_session_age_hours:
-                logger.info(
-                    f"Session expired: {username} ({file_age_hours:.1f}h)",
-                    extra={"username": username, "hours": file_age_hours},
-                )
-                return False
-
-            with open(session_path, "r") as f:
-                data = json.load(f)
-            return data.get("logged_in", False)
-        except (json.JSONDecodeError, OSError):
-            logger.warning(
-                f"Session file corrupt: {username}", extra={"username": username}
-            )
-            return False
-        except Exception as e:
-            logger.error(
-                f"Session validation error: {username} - {e}",
-                extra={"username": username, "error": str(e)},
-                exc_info=True,
-            )
-            return False

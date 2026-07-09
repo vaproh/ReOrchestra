@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, UTC
-import os
 import logging
 
 from app.database import get_db, Account, AccountStatus, AccountType
@@ -26,27 +25,14 @@ from app.models import TaskExecutionLog
 from app.schemas.account import (
     AccountResponse,
     AccountDetailResponse,
-    AccountSessionResponse,
     BatchImportRequest,
     BatchDeleteRequest,
     LoginRequest,
     BatchLoginRequest,
 )
 from app.schemas.common import SuccessResponse
-from app.config import get_settings
 
 router = APIRouter()
-
-
-def session_valid(username: str) -> tuple[bool, float | None]:
-    settings = get_settings()
-    session_path = os.path.join(settings.session_dir, f"{username}.cookies")
-    if not os.path.exists(session_path):
-        return False, None
-    age_hours = (
-        datetime.now(UTC) - datetime.fromtimestamp(os.path.getmtime(session_path))
-    ).total_seconds() / 3600
-    return age_hours < settings.max_session_age_hours, age_hours
 
 
 @router.post("/import", response_model=SuccessResponse, status_code=201)
@@ -147,10 +133,7 @@ async def list_accounts(
             "page": page,
             "per_page": per_page,
             "accounts": [
-                {
-                    **AccountResponse.model_validate(a).model_dump(),
-                    "session_valid": session_valid(a.username)[0],
-                }
+                AccountResponse.model_validate(a).model_dump()
                 for a in accounts
             ],
         }
@@ -166,7 +149,6 @@ async def get_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    is_valid, age_hours = session_valid(account.username)
     recent = (
         db.query(TaskExecutionLog)
         .filter(TaskExecutionLog.account_id == account_id)
@@ -190,13 +172,6 @@ async def get_account(
                 email_verified=account.email_verified,
                 proxy=account.proxy,
                 profile_id=account.profile_id,
-                cookies_present=os.path.exists(
-                    os.path.join(
-                        get_settings().session_dir, f"{account.username}.cookies"
-                    )
-                ),
-                session_valid=is_valid,
-                session_age_hours=age_hours,
                 last_used=account.last_used,
                 last_login=account.last_login,
                 fail_count=account.fail_count,
@@ -261,12 +236,6 @@ async def delete_account(
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    session_path = os.path.join(
-        get_settings().session_dir, f"{account.username}.cookies"
-    )
-    if os.path.exists(session_path):
-        os.remove(session_path)
-
     db.delete(account)
     db.commit()
 
@@ -313,11 +282,6 @@ async def batch_delete_accounts(
 
     accounts = query.all()
     for account in accounts:
-        session_path = os.path.join(
-            get_settings().session_dir, f"{account.username}.cookies"
-        )
-        if os.path.exists(session_path):
-            os.remove(session_path)
         db.delete(account)
 
     db.commit()
@@ -348,7 +312,6 @@ async def login_accounts(
                 username=account.username,
                 password=account.password,
                 proxy=account.proxy,
-                profile_id=account.profile_id,
                 force=request.force,
                 headless=request.options.get("headless", False)
                 if request.options
@@ -464,7 +427,6 @@ async def batch_login_accounts(
                 username=account.username,
                 password=account.password,
                 proxy=account.proxy,
-                profile_id=account.profile_id,
                 force=request.force,
                 headless=request.options.get("headless", False)
                 if request.options
@@ -499,39 +461,5 @@ async def batch_login_accounts(
             "logged_in": succeeded,
             "failed": len(results) - succeeded,
             "results": results,
-        }
-    )
-
-
-@router.get("/{account_id}/session", response_model=SuccessResponse)
-async def check_session(
-    account_id: int,
-    db: Session = Depends(get_db),
-):
-    account = db.query(Account).filter(Account.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
-
-    is_valid, age_hours = session_valid(account.username)
-    settings = get_settings()
-    expires_in = (
-        max(0, settings.max_session_age_hours - age_hours)
-        if age_hours
-        else settings.max_session_age_hours
-    )
-
-    return SuccessResponse(
-        data={
-            "account_id": account.id,
-            "username": account.username,
-            "session_valid": is_valid,
-            "session_age_hours": round(age_hours, 2) if age_hours else None,
-            "expires_in_hours": round(expires_in, 2),
-            "cookies_exist": os.path.exists(
-                os.path.join(settings.session_dir, f"{account.username}.cookies")
-            ),
-            "last_login": account.last_login.isoformat()
-            if account.last_login
-            else None,
         }
     )
