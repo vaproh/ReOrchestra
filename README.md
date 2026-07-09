@@ -11,15 +11,15 @@ Bulk Reddit account automation for managing 500-1000 accounts on a single VPS.
 
 ## ✨ Features
 
-| Feature             | Description                                        |
-| :------------------ | :------------------------------------------------- |
-| **Web Dashboard**   | HTMX + Jinja2 UI at `http://localhost:8000`      |
-| **Queue System**    | Task-based: specify action + URL + accounts needed |
-| **9 Actions**       | Upvote/downvote, follow/unfollow, join/leave, save |
-| **Camofox Browser** | Stealth headless browser with fingerprint spoofing |
-| **Auto-Retry**      | 3 retries with exponential backoff                 |
-| **Deduplication**   | Same account can't do same action twice            |
-| **Account Health**  | Auto-mark dead on ban/suspend, replace accounts    |
+| Feature             | Description                                          |
+| :------------------ | :----------------------------------------------------|
+| **Web Dashboard**   | HTMX + Jinja2 UI at `http://localhost:8000/dashboard`|
+| **Queue System**    | Task-based: specify action + URL + accounts needed   |
+| **9 Actions**       | Upvote/downvote, follow/unfollow, join/leave, save   |
+| **Camofox Browser** | Stealth headless browser with fingerprint spoofing   |
+| **Auto-Retry**      | 3 retries with exponential backoff                   |
+| **Deduplication**   | Same account can't do same action twice              |
+| **Account Health**  | Auto-mark dead on ban/suspend, replace accounts      |
 
 ---
 
