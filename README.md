@@ -28,7 +28,7 @@ Bulk Reddit account automation for managing 500-1000 accounts on a single VPS.
 ### Prerequisites
 
 - 🐍 Python 3.10+
-- 🌐 [Camofox](https://github.com/...) browser server (port 9377)
+- 🌐 [Camofox](https://github.com/jo-inc/camofox-browser) browser server (port 9377)
 - 📋 [`just`](https://just.systems/) — command runner
 - ⚡ [`uv`](https://astral.sh/uv/install.sh) — fast package manager
 
