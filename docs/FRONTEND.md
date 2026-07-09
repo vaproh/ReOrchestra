@@ -20,7 +20,6 @@ Web dashboard for ReOrchestra built with HTMX + Jinja2 + Tailwind + Flowbite.
 ### Dependencies
 
 ```toml
-fasthx>=0.5
 jinja2>=3.0
 python-multipart>=0.0.6
 httpx>=0.24
@@ -204,25 +203,6 @@ POST   /api/proxies/mark-dead      # Mark dead
     <p class="text-2xl font-bold">{{ value }}</p>
 </div>
 ```
-
----
-
-## FastHX Setup
-
-In `main.py`:
-
-```python
-from fasthx import FastHX
-
-app = FastAPI(...)
-hx = FastHX(app)
-
-@hx(template="pages/dashboard.html")
-async def dashboard(request: Request):
-    return {"stats": stats, "request": request}
-```
-
-Use `@hx()` decorator for HTMX-aware template rendering.
 
 ---
 
