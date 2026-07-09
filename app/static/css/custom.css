@@ -27,10 +27,7 @@
     border-left: 3px solid #3b82f6;
 }
 
-/* Table row hover */
-tr:hover td {
-    background-color: #f8fafc;
-}
+
 
 /* Progress bar animation */
 @keyframes progress-indeterminate {

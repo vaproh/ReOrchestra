@@ -68,3 +68,6 @@ Desktop.ini
 # Uploads
 uploads/
 *.upload
+
+# ruff
+.ruff_cache

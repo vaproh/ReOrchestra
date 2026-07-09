@@ -1,9 +1,11 @@
-{% set pct = ((completed / total * 100) | int) if total and total > 0 else 0 %}
-{% set bar_color = 'bg-green-500' if pct == 100 else ('bg-blue-500' if pct > 0 else 'bg-gray-300') %}
+{% set _total = (total | default(0)) | int %}
+{% set _done  = (completed | default(0)) | int %}
+{% set ns = namespace(pct=0, bar='bg-gray-300 dark:bg-gray-600') %}
+{% if _total > 0 %}{% set ns.pct = ((_done * 100) // _total) %}{% endif %}
+{% if ns.pct >= 100 %}{% set ns.bar = 'bg-green-500' %}{% elif ns.pct > 0 %}{% set ns.bar = 'bg-blue-500' %}{% endif %}
 <div class="flex items-center gap-2">
-  <div class="w-28 bg-gray-200 rounded-full h-2 overflow-hidden flex-shrink-0">
-    <div class="{{ bar_color }} h-2 rounded-full transition-all duration-500"
-         style="width: {{ pct }}%"></div>
+  <div class="w-24 bg-gray-200 dark:bg-gray-700/50 rounded-full h-1.5 overflow-hidden flex-shrink-0">
+    <div class="{{ ns.bar }} h-1.5 rounded-full transition-all duration-500" style="width: {{ ns.pct }}%"></div>
   </div>
-  <span class="text-xs text-gray-500 whitespace-nowrap">{{ completed }}/{{ total }}</span>
+  <span class="text-xs text-gray-400 dark:text-gray-600 whitespace-nowrap">{{ _done }}/{{ _total }}</span>
 </div>

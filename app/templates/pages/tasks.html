@@ -14,9 +14,9 @@
 {% set total_pages = ((total / per_page) | int) + (1 if total % per_page else 0) %}
 
 <!-- Create Task Form -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
-  <div class="px-6 py-4 border-b border-gray-100">
-    <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+<div class="rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.06] shadow-sm dark:shadow-none mb-6">
+  <div class="px-6 py-4 border-b border-gray-100 dark:border-white/[0.06]">
+    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
       <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
       </svg>
@@ -33,7 +33,7 @@
       <div>
         <label for="action_type" class="block text-xs font-medium text-gray-600 mb-1.5">Action Type</label>
         <select id="action_type" name="action_type"
-                class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white">
+                class="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 rounded-lg placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none outline-none bg-white">
           <optgroup label="Voting">
             <option value="upvote_post">↑ Upvote Post</option>
             <option value="downvote_post">↓ Downvote Post</option>
@@ -58,20 +58,20 @@
         <input id="target_url" name="target_url" type="url"
                placeholder="https://old.reddit.com/r/example/comments/..."
                required
-               class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+               class="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 rounded-lg placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none outline-none" />
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label for="workers_needed" class="block text-xs font-medium text-gray-600 mb-1.5">Workers</label>
           <input id="workers_needed" name="workers_needed" type="number"
                  value="10" min="1" max="1000"
-                 class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                 class="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 rounded-lg placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none outline-none" />
         </div>
         <div>
           <label for="priority" class="block text-xs font-medium text-gray-600 mb-1.5">Priority</label>
           <input id="priority" name="priority" type="number"
                  value="0" min="0"
-                 class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                 class="w-full px-3 py-2.5 text-sm border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-800/50 text-gray-800 dark:text-gray-200 rounded-lg placeholder-gray-400 dark:placeholder-gray-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none outline-none" />
         </div>
       </div>
     </div>
@@ -93,8 +93,8 @@
 </div>
 
 <!-- Filter Tabs -->
-<div class="bg-white rounded-xl shadow-sm border border-gray-100">
-  <div class="flex items-center gap-1 px-6 py-4 border-b border-gray-100 flex-wrap">
+<div class="rounded-xl bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.06] shadow-sm dark:shadow-none">
+  <div class="flex items-center gap-1 px-6 py-4 border-b border-gray-100 dark:border-white/[0.06] flex-wrap">
     {% set tabs = [
       ('', 'All'),
       ('queued', 'Queued'),
@@ -107,11 +107,11 @@
     {% for tab_val, tab_label in tabs %}
       <a href="/tasks?status={{ tab_val }}&page=1"
          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
-                {% if current_status == tab_val %}bg-blue-600 text-white{% else %}text-gray-500 hover:bg-gray-100 hover:text-gray-700{% endif %}">
+                {% if current_status == tab_val %}bg-blue-600 text-white{% else %}text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-700 dark:hover:text-gray-300{% endif %}">
         {{ tab_label }}
       </a>
     {% endfor %}
-    <div class="ml-auto text-xs text-gray-400">{{ total }} total</div>
+    <div class="ml-auto text-xs text-gray-500 dark:text-gray-400">{{ total }} total</div>
   </div>
 
   <!-- Auto-refresh for running tab -->
@@ -132,7 +132,7 @@
        {% endif %}
        class="overflow-x-auto">
     <table class="w-full text-sm text-left">
-      <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+      <thead class="text-xs text-gray-500 uppercase tracking-wider">
         <tr>
           <th class="px-6 py-3 w-16">ID</th>
           <th class="px-6 py-3">Action</th>
@@ -144,11 +144,11 @@
           <th class="px-6 py-3 text-right">Actions</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-50">
+      <tbody class="divide-y divide-gray-100 dark:divide-white/[0.04]">
         {% if tasks %}
           {% for task in tasks %}
-          <tr id="task-row-{{ task.id }}" class="hover:bg-gray-50 transition-colors group">
-            <td class="px-6 py-3 font-mono text-xs text-gray-400">#{{ task.id }}</td>
+          <tr id="task-row-{{ task.id }}" class="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors group">
+            <td class="px-6 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">#{{ task.id }}</td>
             <td class="px-6 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 whitespace-nowrap">
                 {{ task.action_type | replace('_', ' ') | title }}
@@ -212,7 +212,7 @@
           {% endfor %}
         {% else %}
           <tr>
-            <td colspan="8" class="px-6 py-16 text-center text-gray-400">
+            <td colspan="8" class="px-6 py-16 text-center text-gray-500 dark:text-gray-400">
               <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
               </svg>
@@ -227,8 +227,8 @@
 
   <!-- Pagination -->
   {% if total_pages > 1 %}
-  <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-    <p class="text-xs text-gray-400">
+  <div class="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-white/[0.06]">
+    <p class="text-xs text-gray-500">
       {{ ((current_page - 1) * per_page) + 1 }}–{{ [current_page * per_page, total] | min }} of {{ total }} tasks
     </p>
     <div class="flex items-center gap-1">
@@ -243,7 +243,7 @@
           <a href="/tasks?status={{ current_status | default('') }}&page={{ p }}"
              class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">{{ p }}</a>
         {% elif p == 4 or p == total_pages - 3 %}
-          <span class="px-2 text-gray-400">…</span>
+          <span class="px-2 text-gray-500 dark:text-gray-400">…</span>
         {% endif %}
       {% endfor %}
       {% if current_page < total_pages %}

@@ -6,22 +6,18 @@
   <title>{% block title %}ReOrchestra{% endblock %} — Reddit Automation</title>
   <meta name="description" content="{% block description %}ReOrchestra — Bulk Reddit account automation dashboard{% endblock %}" />
 
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
-          colors: {
-            brand: {
-              50:  '#eff6ff',
-              100: '#dbeafe',
-              500: '#3b82f6',
-              600: '#2563eb',
-              700: '#1d4ed8',
-              900: '#1e3a8a',
-            }
-          }
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
         }
       }
     }
@@ -29,188 +25,240 @@
 
   <!-- Flowbite -->
   <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
-
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
-
   <!-- Custom CSS -->
   <link rel="stylesheet" href="/static/css/custom.css" />
 
-  {% block head %}{% endblock %}
-</head>
-<body class="h-full bg-gray-50 font-sans antialiased" hx-boost="false">
+  <style>
+    /* ── Scrollbar ── */
+    .dark ::-webkit-scrollbar { width: 5px; height: 5px; }
+    .dark ::-webkit-scrollbar-track { background: #0d1117; }
+    .dark ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 
-  <!-- Sidebar Navigation -->
-  <div class="flex h-full min-h-screen">
-    <!-- Sidebar -->
-    <aside id="sidebar" class="fixed top-0 left-0 z-40 h-screen w-64 bg-gray-900 shadow-xl flex flex-col transition-transform -translate-x-full md:translate-x-0" aria-label="Sidenav">
-      <!-- Brand -->
-      <div class="flex items-center gap-3 px-6 py-5 border-b border-gray-700">
-        <div class="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-          </svg>
-        </div>
-        <div>
-          <span class="text-white font-bold text-lg leading-none">ReOrchestra</span>
-          <p class="text-gray-400 text-xs mt-0.5">Reddit Automation</p>
-        </div>
-      </div>
+    /* ── Nav active states ── */
+    .nav-active-light { background: #eff6ff; color: #1d4ed8 !important; }
+    .nav-active-light svg { color: #2563eb; }
+    .dark .nav-active { background: rgba(59,130,246,0.12); color: #93c5fd !important; border-left: 2px solid #3b82f6; }
+    .dark .nav-active svg { color: #93c5fd; }
 
-      <!-- Queue status pill -->
-      <div class="px-4 py-3 border-b border-gray-700">
-        <div id="queue-status-pill"
-             hx-get="/htmx/queue-status"
-             hx-trigger="load, every 15s"
-             hx-swap="outerHTML">
-          <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800">
-            <div class="w-2 h-2 rounded-full bg-gray-500 animate-pulse"></div>
-            <span class="text-gray-400 text-xs font-medium">Checking queue…</span>
-          </div>
-        </div>
-      </div>
+    /* ── HTMX spinner ── */
+    .htmx-indicator { opacity: 0; transition: opacity .2s; }
+    .htmx-request .htmx-indicator,
+    .htmx-request.htmx-indicator { opacity: 1; }
 
-      <!-- Nav links -->
-      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <a href="/dashboard"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'dashboard' %}nav-active{% endif %}">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-          <span class="text-sm font-medium">Dashboard</span>
-        </a>
+    /* ── Card hover ── */
+    .card-hover { transition: box-shadow .2s, transform .15s; }
+    .card-hover:hover { transform: translateY(-1px); }
+    .dark .card-hover:hover { box-shadow: 0 0 0 1px rgba(96,165,250,.15), 0 8px 32px rgba(0,0,0,.4); }
+    .card-hover:hover { box-shadow: 0 4px 20px rgba(0,0,0,.08); }
 
-        <a href="/accounts"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'accounts' %}nav-active{% endif %}">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <span class="text-sm font-medium">Accounts</span>
-          {% if account_count is defined %}
-          <span class="ml-auto bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded-full">{{ account_count }}</span>
-          {% endif %}
-        </a>
-
-        <a href="/tasks"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'tasks' %}nav-active{% endif %}">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
-          <span class="text-sm font-medium">Tasks</span>
-        </a>
-
-        <a href="/proxies"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors group {% if active_page == 'proxies' %}nav-active{% endif %}">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-          </svg>
-          <span class="text-sm font-medium">Proxies</span>
-        </a>
-      </nav>
-
-      <!-- Footer -->
-      <div class="px-4 py-3 border-t border-gray-700">
-        <p class="text-gray-500 text-xs text-center">ReOrchestra v0.9.0</p>
-      </div>
-    </aside>
-
-    <!-- Mobile sidebar toggle -->
-    <button id="sidebar-toggle"
-            class="fixed top-4 left-4 z-50 md:hidden p-2 rounded-lg bg-gray-900 text-white shadow-lg"
-            onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </button>
-
-    <!-- Main content -->
-    <div class="flex-1 md:ml-64 flex flex-col min-h-screen">
-      <!-- Top bar -->
-      <header class="sticky top-0 z-30 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div>
-          <h1 class="text-lg font-semibold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h1>
-          <p class="text-sm text-gray-500">{% block page_subtitle %}{% endblock %}</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <!-- HTMX loading spinner -->
-          <div id="htmx-spinner" class="htmx-indicator flex items-center gap-2 text-blue-600">
-            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            <span class="text-sm font-medium">Loading…</span>
-          </div>
-          {% block header_actions %}{% endblock %}
-        </div>
-      </header>
-
-      <!-- Flash messages -->
-      <div id="flash-container" class="px-6 pt-4">
-        {% block flash %}{% endblock %}
-      </div>
-
-      <!-- Page content -->
-      <main class="flex-1 px-6 py-6">
-        {% block content %}{% endblock %}
-      </main>
-    </div>
-  </div>
-
-  <!-- Toast notification container -->
-  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
-
-  <!-- Flowbite JS -->
-  <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
-
-  <!-- HTMX event handlers for toast notifications -->
-  <script>
-    function showToast(message, type = 'success') {
-      const colors = {
-        success: 'bg-green-50 border-green-200 text-green-800',
-        error:   'bg-red-50 border-red-200 text-red-800',
-        warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-        info:    'bg-blue-50 border-blue-200 text-blue-800',
-      };
-      const icons = {
-        success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-        error:   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-        warning: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>',
-        info:    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-      };
-      const toast = document.createElement('div');
-      toast.className = `toast-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg max-w-sm ${colors[type] || colors.info}`;
-      toast.innerHTML = `
-        <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type] || icons.info}</svg>
-        <p class="text-sm font-medium flex-1">${message}</p>
-        <button onclick="this.parentElement.remove()" class="text-current opacity-60 hover:opacity-100 flex-shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>`;
-      document.getElementById('toast-container').appendChild(toast);
-      setTimeout(() => toast.remove(), 4200);
+    /* ── Toast animation ── */
+    .toast-auto { animation: slideIn .25s ease; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(32px); }
+      to   { opacity: 1; transform: translateX(0); }
     }
 
-    // Listen for HTMX response events to show toasts
-    document.body.addEventListener('htmx:afterRequest', function(evt) {
-      const xhr = evt.detail.xhr;
-      if (!xhr) return;
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          if (data.data && data.data.message) showToast(data.data.message, 'success');
-        } else {
-          const msg = (data.error && data.error.message) || data.error || 'An error occurred';
-          showToast(msg, 'error');
-        }
-      } catch(e) { /* non-JSON response, ignore */ }
-    });
+    /* ── Theme transition ── */
+    *, *::before, *::after { transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+  </style>
 
-    document.body.addEventListener('htmx:responseError', function(evt) {
-      showToast('Request failed. Please try again.', 'error');
-    });
+  <!-- Apply saved theme before first paint to avoid flash -->
+  <script>
+    (function() {
+      var theme = localStorage.getItem('reo-theme') || 'dark';
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+    })();
   </script>
 
-  {% block scripts %}{% endblock %}
+  {% block head %}{% endblock %}
+</head>
+
+<body class="h-full bg-gray-50 dark:bg-[#0d1117] font-sans antialiased" hx-boost="false">
+<div class="flex h-full min-h-screen">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside id="sidebar"
+         class="fixed top-0 left-0 z-40 h-screen w-60 flex flex-col -translate-x-full md:translate-x-0 transition-transform
+                bg-white dark:bg-[#0d1117] border-r border-gray-200 dark:border-white/[0.06]">
+
+    <!-- Brand -->
+    <div class="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100 dark:border-white/[0.06]">
+      <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-violet-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <p class="text-sm font-bold text-gray-900 dark:text-white leading-none">ReOrchestra</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Reddit Automation</p>
+      </div>
+    </div>
+
+    <!-- Queue status -->
+    <div class="px-3 py-2.5 border-b border-gray-100 dark:border-white/[0.06]">
+      <div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="load, every 15s" hx-swap="outerHTML">
+        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-100 dark:bg-white/[0.04]">
+          <div class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse flex-shrink-0"></div>
+          <span class="text-gray-500 dark:text-gray-400 text-xs font-medium">Checking…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+      {% set nav_items = [
+        ('dashboard', '/dashboard', 'Dashboard',
+         'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'),
+        ('accounts', '/accounts', 'Accounts',
+         'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'),
+        ('tasks', '/tasks', 'Tasks',
+         'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'),
+        ('proxies', '/proxies', 'Proxies',
+         'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9'),
+      ] %}
+      {% for page_id, href, label, icon_d in nav_items %}
+      <a href="{{ href }}"
+         class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                text-gray-600 dark:text-gray-400
+                hover:bg-gray-100 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-gray-100
+                {% if active_page == page_id %}bg-blue-50 dark:bg-blue-500/[0.12] text-blue-700 dark:text-blue-400{% endif %}">
+        <svg class="w-4 h-4 flex-shrink-0 {% if active_page == page_id %}text-blue-600 dark:text-blue-400{% else %}text-gray-400 dark:text-gray-500{% endif %}"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_d }}" />
+        </svg>
+        {{ label }}
+      </a>
+      {% endfor %}
+    </nav>
+
+    <!-- Footer -->
+    <div class="px-4 py-3 border-t border-gray-100 dark:border-white/[0.06]">
+      <p class="text-gray-400 dark:text-gray-600 text-xs text-center">ReOrchestra v0.9.0</p>
+    </div>
+  </aside>
+
+  <!-- Mobile toggle -->
+  <button class="fixed top-3 left-3 z-50 md:hidden p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow"
+          onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')">
+    <svg class="w-4 h-4 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+
+  <!-- ── Main ──────────────────────────────────────────────── -->
+  <div class="flex-1 md:ml-60 flex flex-col min-h-screen">
+
+    <!-- Top bar -->
+    <header class="sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between
+                   bg-white/90 dark:bg-[#0d1117]/90 backdrop-blur-md
+                   border-b border-gray-200 dark:border-white/[0.06]">
+      <div>
+        <h1 class="text-sm font-semibold text-gray-900 dark:text-white">{% block page_title %}Dashboard{% endblock %}</h1>
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{% block page_subtitle %}{% endblock %}</p>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <!-- HTMX spinner -->
+        <div id="htmx-spinner" class="htmx-indicator flex items-center gap-1.5 text-blue-500">
+          <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span class="text-xs">Loading…</span>
+        </div>
+
+        {% block header_actions %}{% endblock %}
+
+        <!-- Theme toggle -->
+        <button id="theme-toggle" onclick="toggleTheme()"
+                class="p-1.5 rounded-lg text-gray-500 dark:text-gray-400
+                       hover:bg-gray-100 dark:hover:bg-white/[0.06]
+                       hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                title="Toggle theme">
+          <!-- Sun (shown in dark mode) -->
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M18.364 17.657l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>
+          <!-- Moon (shown in light mode) -->
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Flash messages -->
+    <div id="flash-container" class="px-6 pt-4">{% block flash %}{% endblock %}</div>
+
+    <!-- Page content -->
+    <main class="flex-1 px-6 py-6">{% block content %}{% endblock %}</main>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+<!-- Flowbite JS -->
+<script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+
+<script>
+  /* ── Theme toggle ── */
+  function toggleTheme() {
+    var html = document.documentElement;
+    var isDark = html.classList.toggle('dark');
+    localStorage.setItem('reo-theme', isDark ? 'dark' : 'light');
+  }
+
+  /* ── Toasts ── */
+  function showToast(message, type) {
+    type = type || 'success';
+    var cls = {
+      success: 'bg-white dark:bg-gray-800 border-green-200 dark:border-green-700/50 text-green-700 dark:text-green-400',
+      error:   'bg-white dark:bg-gray-800 border-red-200 dark:border-red-700/50 text-red-700 dark:text-red-400',
+      warning: 'bg-white dark:bg-gray-800 border-yellow-200 dark:border-yellow-700/50 text-yellow-700 dark:text-yellow-400',
+      info:    'bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-700/50 text-blue-700 dark:text-blue-400',
+    };
+    var icons = {
+      success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+      error:   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+      warning: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>',
+      info:    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+    };
+    var t = document.createElement('div');
+    t.className = 'toast-auto flex items-start gap-2.5 p-3.5 rounded-xl border shadow-lg max-w-xs ' + (cls[type] || cls.info);
+    t.innerHTML =
+      '<svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' + (icons[type] || icons.info) + '</svg>' +
+      '<p class="text-sm font-medium flex-1">' + message + '</p>' +
+      '<button onclick="this.parentElement.remove()" class="opacity-50 hover:opacity-100 flex-shrink-0">' +
+        '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>' +
+      '</button>';
+    document.getElementById('toast-container').appendChild(t);
+    setTimeout(function() { t.remove(); }, 4000);
+  }
+
+  document.body.addEventListener('htmx:afterRequest', function(evt) {
+    var xhr = evt.detail.xhr;
+    if (!xhr) return;
+    try {
+      var data = JSON.parse(xhr.responseText);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        if (data.data && data.data.message) showToast(data.data.message, 'success');
+      } else {
+        var msg = (data.error && data.error.message) || data.error || 'An error occurred';
+        showToast(msg, 'error');
+      }
+    } catch(e) {}
+  });
+
+  document.body.addEventListener('htmx:responseError', function() {
+    showToast('Request failed. Please try again.', 'error');
+  });
+</script>
+
+{% block scripts %}{% endblock %}
 </body>
 </html>

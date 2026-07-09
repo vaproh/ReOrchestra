@@ -2,20 +2,19 @@
 
 # Install dependencies
 install:
-    uv venv
-    uv pip install -e .
+    uv sync
 
 # Start server
 run:
-    uvicorn app.main:app --host 0.0.0.0 --port 8000
+    uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # Start with auto-reload
 dev:
-    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Start with debug logging
 debug:
-    LOG_LEVEL=DEBUG uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    LOG_LEVEL=DEBUG uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Tail logs
 logs:
@@ -41,12 +40,12 @@ cleanup: clean
 
 # Run tests
 test:
-    pytest
+    uv run pytest tests/
 
 # Lint code
 lint:
-    ruff check .
+    uv run ruff check app/ tests/
 
 # Format code
 fmt:
-    ruff format app/ tests/
+    uv run ruff format app/ tests/

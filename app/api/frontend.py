@@ -18,7 +18,7 @@ router = APIRouter()
 _TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates")
 _jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(_TEMPLATES_DIR),
-    autoescape=jinja2.select_autoescape(["html"]),
+    autoescape=True,  # simple bool avoids Python 3.14 select_autoescape recursion
     auto_reload=False,
 )
 templates = Jinja2Templates(env=_jinja_env)
@@ -156,15 +156,15 @@ async def htmx_queue_status(request: Request, db: Session = Depends(get_db)):
     processing = qs["data"]["processing"]
     if processing:
         html = '''<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-900/30 border border-green-800/30">
-                    <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                    <span class="text-green-400 text-xs font-medium">Queue Running</span>
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800/30 transition-colors">
+                    <div class="w-2 h-2 rounded-full bg-green-500 dark:bg-green-400 animate-pulse"></div>
+                    <span class="text-green-700 dark:text-green-400 text-xs font-medium">Queue Running</span>
                   </div>'''
     else:
         html = '''<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/20 border border-red-800/20">
-                    <div class="w-2 h-2 rounded-full bg-red-400"></div>
-                    <span class="text-red-400 text-xs font-medium">Queue Stopped</span>
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/20 transition-colors">
+                    <div class="w-2 h-2 rounded-full bg-red-500 dark:bg-red-400"></div>
+                    <span class="text-red-700 dark:text-red-400 text-xs font-medium">Queue Stopped</span>
                   </div>'''
     return HTMLResponse(html)
 
@@ -178,8 +178,9 @@ async def htmx_stats(request: Request, db: Session = Depends(get_db)):
     stats = _get_admin_stats(db)
     qs = _get_queue_status(db)
     return templates.TemplateResponse(
+        request,
         "partials/stats_cards.html",
-        {"request": request, "stats": stats, "queue_status": qs},
+        {"stats": stats, "queue_status": qs},
     )
 
 
@@ -207,9 +208,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     recent_tasks = {"success": True, "data": {"tasks": [_task_dict(t) for t in tasks_q]}}
 
     return templates.TemplateResponse(
+        request,
         "pages/dashboard.html",
         {
-            "request": request,
             "active_page": "dashboard",
             "stats": stats,
             "queue_status": queue_status,
@@ -267,9 +268,9 @@ async def accounts_page(
     }
 
     return templates.TemplateResponse(
+        request,
         "pages/accounts.html",
         {
-            "request": request,
             "active_page": "accounts",
             "accounts_data": accounts_data,
             "current_status": status or "",
@@ -308,9 +309,9 @@ async def tasks_page(
     }
 
     return templates.TemplateResponse(
+        request,
         "pages/tasks.html",
         {
-            "request": request,
             "active_page": "tasks",
             "tasks_data": tasks_data,
             "current_status": status or "",
@@ -356,9 +357,9 @@ async def task_detail_page(
     ]
 
     return templates.TemplateResponse(
+        request,
         "pages/task_detail.html",
         {
-            "request": request,
             "active_page": "tasks",
             "task": task,
             "logs": logs,
@@ -406,9 +407,9 @@ async def proxies_page(
     }
 
     return templates.TemplateResponse(
+        request,
         "pages/proxies.html",
         {
-            "request": request,
             "active_page": "proxies",
             "proxies_data": proxies_data,
             "current_status": status or "",
