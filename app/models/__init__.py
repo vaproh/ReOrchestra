@@ -59,11 +59,6 @@ class Account(Base):
     active_hours_start = Column(Integer, default=7)
     active_hours_end = Column(Integer, default=23)
 
-    csrf_token = Column(String(128), nullable=True)
-    session_valid = Column(Boolean, default=False)
-
-    consecutive_failures = Column(Integer, default=0)
-    last_failure_at = Column(DateTime, nullable=True)
     dead_reason = Column(String(64), nullable=True)
 
     last_used = Column(DateTime, nullable=True)
@@ -88,11 +83,8 @@ class Proxy(Base):
     password = Column(String(128), nullable=True)
 
     provider = Column(String(50), nullable=True)
-    country = Column(String(10), nullable=True)
-    region = Column(String(50), nullable=True)
 
     assigned_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
-    session_id = Column(String(32), nullable=True)
 
     status = Column(String(20), default="active")
     is_active = Column(Boolean, default=True)

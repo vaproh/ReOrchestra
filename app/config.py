@@ -26,11 +26,6 @@ class Settings(BaseSettings):
     vnc_enabled: bool = False
     vnc_port: int = 5999
 
-    # ===== ACTION TIMING =====
-    action_delay_ms_min: int = 1000
-    action_delay_ms_max: int = 3000
-    batch_size_default: int = 50
-
     # ===== QUEUE =====
     max_concurrent_per_task: int = 1
 
@@ -50,10 +45,7 @@ class Settings(BaseSettings):
     timeout_camofox_close: int = 10
     timeout_camofox_health: int = 5
     timeout_camofox_proxy: int = 10
-    timeout_sticky_proxy: int = 10
-    timeout_slot_health: int = 5
     timeout_admin_health: int = 3
-    action_timeout_seconds: int = 120
     post_click_wait_ms: int = 3000
 
     @property
