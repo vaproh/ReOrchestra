@@ -42,10 +42,6 @@ class Account(Base):
     username = Column(String(20), unique=True, nullable=False)
     password = Column(String(128), nullable=False)
     email = Column(String(128), nullable=True)
-
-    cookies = Column(Text, nullable=True)
-    bearer_token = Column(String(512), nullable=True)
-    user_agent = Column(String(256), nullable=True)
     proxy = Column(String(64), nullable=True)
 
     status = Column(SQLEnum(AccountStatus), default=AccountStatus.fresh)
