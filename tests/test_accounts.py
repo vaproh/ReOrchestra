@@ -132,7 +132,7 @@ class TestAccountImport:
         account = Account(
             username="minimal_user",
             password="password123",
-            # email=None, email_password=None, proxy=None
+            # email=None, proxy=None
             status=AccountStatus.fresh,
             account_type=AccountType.upvoter,
         )
@@ -141,9 +141,7 @@ class TestAccountImport:
 
         db_session.refresh(account)
         assert account.email is None
-        assert account.email_password is None
         assert account.proxy is None
-        assert account.email_verified is False
 
     def test_import_with_invalid_data_types(self, db_session):
         """Import with invalid data types should fail validation."""

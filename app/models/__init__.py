@@ -42,8 +42,6 @@ class Account(Base):
     username = Column(String(20), unique=True, nullable=False)
     password = Column(String(128), nullable=False)
     email = Column(String(128), nullable=True)
-    email_password = Column(String(128), nullable=True)
-    email_verified = Column(Boolean, default=False)
 
     cookies = Column(Text, nullable=True)
     bearer_token = Column(String(512), nullable=True)

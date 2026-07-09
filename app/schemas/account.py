@@ -7,7 +7,6 @@ class AccountBase(BaseModel):
     username: str = Field(..., min_length=1, max_length=20)
     password: str
     email: Optional[str] = None
-    email_password: Optional[str] = None
     proxy: Optional[str] = None
     account_type: str = "upvoter"
 
@@ -26,7 +25,6 @@ class AccountResponse(BaseModel):
     status: str
     account_type: str
     karma_total: int
-    email_verified: bool
     proxy: Optional[str]
     last_used: Optional[datetime]
     fail_count: int
@@ -45,7 +43,6 @@ class AccountDetailResponse(BaseModel):
     karma_post: int
     karma_comment: int
     email: Optional[str]
-    email_verified: bool
     proxy: Optional[str]
     last_used: Optional[datetime]
     last_login: Optional[datetime]

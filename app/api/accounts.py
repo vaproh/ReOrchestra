@@ -17,7 +17,6 @@ ACCOUNT_SORT_COLUMNS = {
     "last_used",
     "last_login",
     "created_at",
-    "email_verified",
 }
 
 logger = logging.getLogger("accounts")
@@ -59,7 +58,6 @@ async def import_accounts(
             username=acc_data.username,
             password=acc_data.password,
             email=acc_data.email,
-            email_password=acc_data.email_password,
             proxy=acc_data.proxy,
             account_type=AccountType[request.account_type],
             status=AccountStatus.fresh,
@@ -169,9 +167,7 @@ async def get_account(
                 karma_post=account.karma_post,
                 karma_comment=account.karma_comment,
                 email=account.email,
-                email_verified=account.email_verified,
                 proxy=account.proxy,
-                profile_id=account.profile_id,
                 last_used=account.last_used,
                 last_login=account.last_login,
                 fail_count=account.fail_count,
