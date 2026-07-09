@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block page_title %}System Health & Logs{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full pb-6">
+  
+  <!-- Left Column: Infrastructure Health -->
+  <div class="space-y-6 lg:col-span-1">
+    <div class="rounded-xl p-5 bg-white dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.06] shadow-sm dark:shadow-none">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Infrastructure</h2>
+      
+      <div class="space-y-4">
+        <!-- Camofox Status -->
+        <div class="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-[#000000] border border-gray-100 dark:border-white/[0.06]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-md bg-orange-100 dark:bg-orange-500/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Camofox Browser</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Port {{ health.camofox.port }}</p>
+            </div>
+          </div>
+          <div>
+            {% if health.camofox.connected %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 border border-green-200 dark:border-green-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                Connected
+              </span>
+            {% else %}
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-red-200 dark:border-red-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                Offline
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Queue Status -->
+        <div class="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-[#000000] border border-gray-100 dark:border-white/[0.06]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-md bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Task Queue</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Actions Today: {{ stats.actions.today }}</p>
+            </div>
+          </div>
+          <div>
+             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20">
+                Active
+             </span>
+          </div>
+        </div>
+        
+        <!-- API Status -->
+        <div class="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-[#000000] border border-gray-100 dark:border-white/[0.06]">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-md bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">Core API</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">v{{ health.version }}</p>
+            </div>
+          </div>
+          <div>
+             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 border border-green-200 dark:border-green-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                Healthy
+             </span>
+          </div>
+        </div>
+
+        <!-- Host Information (Expanded) -->
+        <div class="flex flex-col gap-3 p-4 rounded-lg bg-gray-50 dark:bg-[#000000] border border-gray-100 dark:border-white/[0.06]">
+          <div class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-white/[0.06]">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-md bg-teal-100 dark:bg-teal-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ host.os }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ host.cpu_cores }} Cores • Load: {{ host.load }}</p>
+              </div>
+            </div>
+            <div>
+               <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 dark:bg-white/[0.05] dark:text-gray-300 border border-gray-200 dark:border-white/[0.1]">
+                  {{ host.release }}
+               </span>
+            </div>
+          </div>
+          
+          <!-- CPU Bar -->
+          <div class="mt-1">
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-gray-600 dark:text-gray-400">CPU Usage</span>
+              <span class="font-medium text-gray-900 dark:text-gray-200">{{ host.cpu_percent }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-white/[0.05] rounded-full h-1.5">
+              <div class="bg-teal-500 h-1.5 rounded-full" style="width: {{ host.cpu_percent }}%"></div>
+            </div>
+          </div>
+          
+          <!-- RAM Bar -->
+          <div>
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-gray-600 dark:text-gray-400">Memory ({{ host.ram.used_gb }} / {{ host.ram.total_gb }} GB)</span>
+              <span class="font-medium text-gray-900 dark:text-gray-200">{{ host.ram.percent }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-white/[0.05] rounded-full h-1.5">
+              <div class="bg-blue-500 h-1.5 rounded-full" style="width: {{ host.ram.percent }}%"></div>
+            </div>
+          </div>
+          
+          <!-- Disk Bar -->
+          <div>
+            <div class="flex justify-between text-xs mb-1.5">
+              <span class="text-gray-600 dark:text-gray-400">Disk Space ({{ host.disk.used_gb }} / {{ host.disk.total_gb }} GB)</span>
+              <span class="font-medium text-gray-900 dark:text-gray-200">{{ host.disk.percent }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-white/[0.05] rounded-full h-1.5">
+              <div class="bg-purple-500 h-1.5 rounded-full" style="width: {{ host.disk.percent }}%"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Live Logs -->
+  <div class="lg:col-span-2 flex flex-col h-[calc(100vh-8rem)]">
+    <div class="flex-1 flex flex-col rounded-xl bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-white/[0.06] shadow-sm dark:shadow-none overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-white/[0.06] bg-gray-50 dark:bg-[#050505]">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Live Action Logs</h2>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-medium text-gray-500 dark:text-gray-400">Level:</label>
+            <select id="log-level-filter" class="text-xs bg-transparent border-none text-gray-700 dark:text-gray-300 focus:ring-0 cursor-pointer py-0 pl-0 pr-5 font-medium">
+              <option value="ALL" selected class="dark:bg-[#0a0a0a]">ALL</option>
+              <option value="DEBUG" class="dark:bg-[#0a0a0a]">DEBUG</option>
+              <option value="INFO" class="dark:bg-[#0a0a0a]">INFO</option>
+              <option value="WARNING" class="dark:bg-[#0a0a0a]">WARNING</option>
+              <option value="ERROR" class="dark:bg-[#0a0a0a]">ERROR</option>
+            </select>
+          </div>
+          <button id="clear-logs" class="text-xs font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
+            Clear
+          </button>
+        </div>
+      </div>
+      
+      <div class="flex-1 overflow-y-auto p-4 bg-[#f8f9fa] dark:bg-[#000000] font-mono text-xs leading-relaxed" id="log-container">
+        <!-- Logs will be streamed here -->
+        <div class="text-gray-400 italic mb-2">Connecting to live log stream...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<style>
+  /* Log styling */
+  .log-line {
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(156, 163, 175, 0.1);
+      word-break: break-all;
+  }
+  .log-line:last-child {
+      border-bottom: none;
+  }
+  .log-info { color: #3b82f6; }
+  .log-warning { color: #f59e0b; }
+  .log-error { color: #ef4444; }
+  .log-debug { color: #8b5cf6; }
+  
+  .dark .log-info { color: #60a5fa; }
+  .dark .log-warning { color: #fbbf24; }
+  .dark .log-error { color: #f87171; }
+  .dark .log-debug { color: #a78bfa; }
+  
+  .log-timestamp { color: #9ca3af; margin-right: 8px; }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const container = document.getElementById("log-container");
+    const clearBtn = document.getElementById("clear-logs");
+    
+    // Auto-scroll toggle (optional enhancement, assuming always true for simplicity)
+    let autoScroll = true;
+    container.addEventListener('scroll', () => {
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+        autoScroll = isAtBottom;
+    });
+
+        const logFilter = document.getElementById("log-level-filter");
+    let currentFilter = logFilter.value;
+    
+    logFilter.addEventListener("change", (e) => {
+        currentFilter = e.target.value;
+        const lines = container.querySelectorAll(".log-line");
+        lines.forEach(line => {
+            if (currentFilter === "ALL" || line.dataset.level === currentFilter) {
+                line.style.display = "block";
+            } else {
+                line.style.display = "none";
+            }
+        });
+        if (autoScroll) {
+            container.scrollTop = container.scrollHeight;
+        }
+    });
+
+    const source = new EventSource("/api/admin/logs/stream");
+    
+    source.onopen = () => {
+        container.innerHTML = '<div class="text-green-500 mb-2">✓ Connected to log stream</div>';
+    };
+    
+    source.onmessage = (event) => {
+        const line = event.data;
+        if (!line.trim()) return;
+        
+        const div = document.createElement("div");
+        div.className = "log-line text-gray-800 dark:text-gray-300";
+        
+        // Simple color coding based on log level presence
+        let level = "INFO";
+        if (line.includes("INFO")) { div.classList.add("log-info"); level = "INFO"; }
+        else if (line.includes("WARNING")) { div.classList.add("log-warning"); level = "WARNING"; }
+        else if (line.includes("ERROR")) { div.classList.add("log-error"); level = "ERROR"; }
+        else if (line.includes("DEBUG")) { div.classList.add("log-debug"); level = "DEBUG"; }
+        
+        div.dataset.level = level;
+        if (currentFilter !== "ALL" && currentFilter !== level) {
+            div.style.display = "none";
+        }
+        
+        // Add timestamp styling if it follows the YYYY-MM-DD HH:MM:SS format
+        const formattedLine = line.replace(/^(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s\|/, '<span class="log-timestamp">$1</span> |');
+        
+        div.innerHTML = formattedLine;
+        container.appendChild(div);
+        
+        // Keep max 1000 lines to prevent DOM bloat
+        if (container.children.length > 1000) {
+            container.removeChild(container.firstChild);
+        }
+        
+        if (autoScroll) {
+            container.scrollTop = container.scrollHeight;
+        }
+    };
+    
+    source.onerror = (err) => {
+        const div = document.createElement("div");
+        div.className = "text-red-500 italic mt-2";
+        div.innerText = "Connection to log stream lost. Retrying...";
+        container.appendChild(div);
+    };
+
+    clearBtn.addEventListener("click", () => {
+        container.innerHTML = '<div class="text-gray-400 italic mb-2">Logs cleared. Waiting for new events...</div>';
+    });
+  });
+</script>
+{% endblock %}

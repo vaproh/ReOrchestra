@@ -156,15 +156,15 @@ async def htmx_queue_status(request: Request, db: Session = Depends(get_db)):
     processing = qs["data"]["processing"]
     if processing:
         html = '''<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800/30 transition-colors">
-                    <div class="w-2 h-2 rounded-full bg-green-500 dark:bg-green-400 animate-pulse"></div>
-                    <span class="text-green-700 dark:text-green-400 text-xs font-medium">Queue Running</span>
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-900/30 border border-green-800/30 transition-colors">
+                    <div class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                    <span class="text-green-400 text-xs font-medium">Queue Running</span>
                   </div>'''
     else:
         html = '''<div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="every 15s" hx-swap="outerHTML"
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/20 transition-colors">
-                    <div class="w-2 h-2 rounded-full bg-red-500 dark:bg-red-400"></div>
-                    <span class="text-red-700 dark:text-red-400 text-xs font-medium">Queue Stopped</span>
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-900/20 border border-red-800/20 transition-colors">
+                    <div class="w-2 h-2 rounded-full bg-red-400"></div>
+                    <span class="text-red-400 text-xs font-medium">Queue Stopped</span>
                   </div>'''
     return HTMLResponse(html)
 
@@ -414,5 +414,74 @@ async def proxies_page(
             "proxies_data": proxies_data,
             "current_status": status or "",
             "page": page,
+        },
+    )
+
+
+@router.get("/system", response_class=HTMLResponse)
+async def system_page(request: Request, db: Session = Depends(get_db)):
+    from app.api.admin import health_check
+    import platform
+    import os
+    import psutil
+    
+    # Get camofox and general health status
+    health_resp = await health_check()
+    health_data = health_resp.data
+    
+    # Get db, proxy, and queue stats
+    stats_data = _get_admin_stats(db)["data"]
+    
+    # Distro info
+    try:
+        os_info = platform.freedesktop_os_release()
+        distro_name = os_info.get("NAME", platform.system())
+        distro_version = os_info.get("VERSION", platform.release())
+    except (AttributeError, FileNotFoundError, OSError):
+        distro_name = platform.system()
+        distro_version = platform.release()
+
+    # Memory
+    mem = psutil.virtual_memory()
+    # Disk (check the partition where the app resides instead of root)
+    disk = psutil.disk_usage(os.path.abspath('.'))
+    
+    # CPU Load
+    cpu_cores = psutil.cpu_count(logical=True)
+    try:
+        load = os.getloadavg()
+        load_str = f"{load[0]:.2f}, {load[1]:.2f}, {load[2]:.2f}"
+        # Estimate CPU usage from 1-minute load average (clamped to 100%)
+        cpu_percent = min(round((load[0] / cpu_cores) * 100, 1), 100.0)
+    except AttributeError:
+        load_str = "N/A"
+        cpu_percent = psutil.cpu_percent(interval=None)
+        
+    host_info = {
+        "os": distro_name,
+        "release": distro_version,
+        "cpu_cores": cpu_cores,
+        "cpu_percent": cpu_percent,
+        "load": load_str,
+        "ram": {
+            "total_gb": round(mem.total / (1024**3), 2),
+            "used_gb": round(mem.used / (1024**3), 2),
+            "percent": mem.percent
+        },
+        "disk": {
+            "total_gb": round(disk.total / (1024**3), 2),
+            "used_gb": round(disk.used / (1024**3), 2),
+            "percent": disk.percent
+        }
+    }
+    
+    return templates.TemplateResponse(
+        request,
+        "pages/system.html",
+        {
+            "active_page": "system",
+            "health": health_data,
+            "stats": stats_data,
+            "host": host_info,
         },
     )

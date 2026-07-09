@@ -28,12 +28,12 @@
   <!-- HTMX -->
   <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
   <!-- Custom CSS -->
-  <link rel="stylesheet" href="/static/css/custom.css" />
+  <link rel="stylesheet" href="/static/css/custom.css?v=1.1" />
 
   <style>
     /* ── Scrollbar ── */
     .dark ::-webkit-scrollbar { width: 5px; height: 5px; }
-    .dark ::-webkit-scrollbar-track { background: #0d1117; }
+    .dark ::-webkit-scrollbar-track { background: #000000; }
     .dark ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 
     /* ── Nav active states ── */
@@ -75,34 +75,34 @@
   {% block head %}{% endblock %}
 </head>
 
-<body class="h-full bg-gray-50 dark:bg-[#0d1117] font-sans antialiased" hx-boost="false">
+<body class="h-full bg-gray-50 dark:bg-black font-sans antialiased" hx-boost="false">
 <div class="flex h-full min-h-screen">
 
   <!-- ── Sidebar ──────────────────────────────────────────── -->
   <aside id="sidebar"
          class="fixed top-0 left-0 z-40 h-screen w-60 flex flex-col -translate-x-full md:translate-x-0 transition-transform
-                bg-white dark:bg-[#0d1117] border-r border-gray-200 dark:border-white/[0.06]">
+                bg-[#000000] border-r border-white/[0.06]">
 
     <!-- Brand -->
-    <div class="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100 dark:border-white/[0.06]">
-      <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-violet-600 rounded-lg flex items-center justify-center flex-shrink-0">
+    <div class="flex items-center gap-2.5 px-5 py-4 border-b border-white/[0.06]">
+      <div class="w-8 h-8 bg-gradient-to-br from-reddit-500 to-orange-600 rounded-lg flex items-center justify-center flex-shrink-0">
         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
         </svg>
       </div>
       <div class="min-w-0">
-        <p class="text-sm font-bold text-gray-900 dark:text-white leading-none">ReOrchestra</p>
-        <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Reddit Automation</p>
+        <p class="text-sm font-bold text-white leading-none">ReOrchestra</p>
+        <p class="text-xs text-gray-500 mt-0.5">Reddit Automation</p>
       </div>
     </div>
 
     <!-- Queue status -->
-    <div class="px-3 py-2.5 border-b border-gray-100 dark:border-white/[0.06]">
+    <div class="px-3 py-2.5 border-b border-white/[0.06]">
       <div id="queue-status-pill" hx-get="/htmx/queue-status" hx-trigger="load, every 15s" hx-swap="outerHTML">
-        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-100 dark:bg-white/[0.04]">
+        <div class="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-white/[0.04]">
           <div class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-pulse flex-shrink-0"></div>
-          <span class="text-gray-500 dark:text-gray-400 text-xs font-medium">Checking…</span>
+          <span class="text-gray-400 text-xs font-medium">Checking…</span>
         </div>
       </div>
     </div>
@@ -118,14 +118,15 @@
          'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01'),
         ('proxies', '/proxies', 'Proxies',
          'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9'),
+        ('system', '/system', 'System',
+         'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01'),
       ] %}
       {% for page_id, href, label, icon_d in nav_items %}
       <a href="{{ href }}"
          class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                text-gray-600 dark:text-gray-400
-                hover:bg-gray-100 dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-gray-100
-                {% if active_page == page_id %}bg-blue-50 dark:bg-blue-500/[0.12] text-blue-700 dark:text-blue-400{% endif %}">
-        <svg class="w-4 h-4 flex-shrink-0 {% if active_page == page_id %}text-blue-600 dark:text-blue-400{% else %}text-gray-400 dark:text-gray-500{% endif %}"
+                text-gray-400 hover:bg-white/[0.06] hover:text-gray-100
+                {% if active_page == page_id %}bg-indigo-500/[0.12] text-indigo-400{% endif %}">
+        <svg class="w-4 h-4 flex-shrink-0 {% if active_page == page_id %}text-indigo-400{% else %}text-gray-500{% endif %}"
              fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icon_d }}" />
         </svg>
@@ -135,8 +136,8 @@
     </nav>
 
     <!-- Footer -->
-    <div class="px-4 py-3 border-t border-gray-100 dark:border-white/[0.06]">
-      <p class="text-gray-400 dark:text-gray-600 text-xs text-center">ReOrchestra v0.9.0</p>
+    <div class="px-4 py-3 border-t border-white/[0.06]">
+      <p class="text-gray-500 text-xs text-center">ReOrchestra v0.9.0</p>
     </div>
   </aside>
 
@@ -153,7 +154,7 @@
 
     <!-- Top bar -->
     <header class="sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between
-                   bg-white/90 dark:bg-[#0d1117]/90 backdrop-blur-md
+                   bg-white/90 dark:bg-black/90 backdrop-blur-md
                    border-b border-gray-200 dark:border-white/[0.06]">
       <div>
         <h1 class="text-sm font-semibold text-gray-900 dark:text-white">{% block page_title %}Dashboard{% endblock %}</h1>

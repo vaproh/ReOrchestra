@@ -51,3 +51,10 @@ def get_logger(name: str) -> logging.Logger:
     if not logging.getLogger().handlers:
         setup_logging()
     return logging.getLogger(name)
+
+def set_dynamic_log_level(level_str: str) -> None:
+    level = getattr(logging, level_str.upper(), logging.INFO)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    for handler in root_logger.handlers:
+        handler.setLevel(level)
