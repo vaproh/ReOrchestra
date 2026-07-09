@@ -6,15 +6,15 @@ install:
 
 # Start server
 run:
-    uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+    uv run -- python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # Start with auto-reload
 dev:
-    uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    uv run -- python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Start with debug logging
 debug:
-    LOG_LEVEL=DEBUG uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    LOG_LEVEL=DEBUG uv run -- python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Tail logs
 logs:
